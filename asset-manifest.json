@@ -1,12 +1,12 @@
 {
   "files": {
     "main.css": "/grid-drawing-tool/static/css/main.f364fef0.css",
-    "main.js": "/grid-drawing-tool/static/js/main.50f8e597.js",
+    "main.js": "/grid-drawing-tool/static/js/main.f8d2c050.js",
     "static/js/206.fb4b0d64.chunk.js": "/grid-drawing-tool/static/js/206.fb4b0d64.chunk.js",
     "index.html": "/grid-drawing-tool/index.html"
   },
   "entrypoints": [
     "static/css/main.f364fef0.css",
-    "static/js/main.50f8e597.js"
+    "static/js/main.f8d2c050.js"
   ]
 }
