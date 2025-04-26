@@ -1,46 +1,85 @@
-# Getting Started with Create React App
+# Grid Drawing Tool
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React-based drawing tool that allows users to create pixel art and geometric patterns on a grid. The tool supports both square pixels and triangular subdivisions, making it perfect for creating pixel art, isometric designs, and geometric patterns.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- 26x26 grid with adjustable pixel size
+- Two drawing modes:
+  - Square pixels
+  - Triangular subdivisions (top-left, top-right, bottom-left, bottom-right)
+- Color toggling between black and white
+- Export capabilities:
+  - PNG export
+  - SVG export
+  - JSON export (for saving and loading drawings)
+- Drag and drop support for loading saved drawings
+- Keyboard shortcuts for quick access to features
 
-### `npm start`
+## Keyboard Controls
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- `X`: Toggle between black and white colors
+- `Q`: Top-left triangle mode
+- `W`: Top-right triangle mode
+- `A`: Bottom-left triangle mode
+- `S`: Bottom-right triangle mode
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## Installation
 
-### `npm test`
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/grid-drawing-tool.git
+cd grid-drawing-tool
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2. Install dependencies:
+```bash
+npm install
+```
 
-### `npm run build`
+## Development
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+To start the development server:
+```bash
+npm start
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+This will run the app in development mode. Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Building for Production
 
-### `npm run eject`
+To create a production build:
+```bash
+npm run build
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+The build artifacts will be stored in the `build/` directory.
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Serving the Production Build
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+You can serve the production build using any static file server. For example, using `serve`:
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+1. Install serve globally:
+```bash
+npm install -g serve
+```
 
-## Learn More
+2. Serve the build directory:
+```bash
+serve -s build
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## How It Works
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+The grid drawing tool is built using React and styled-components. The main components are:
+
+1. **Grid Container**: A styled div that creates the grid layout using CSS Grid
+2. **Pixel Elements**: Individual cells that can be either square pixels or contain triangular subdivisions
+3. **Drawing State**: Manages the current drawing mode, color, and triangle orientation
+4. **Export Functions**: Convert the grid state to various formats (PNG, SVG, JSON)
+
+The tool uses Bresenham's line algorithm for smooth line drawing when dragging the mouse across multiple pixels. The drawing state is managed using React's useState hook, and the grid is represented as a 2D array of pixel objects.
+
+## License
+
+This project is open source and available under the MIT License.
