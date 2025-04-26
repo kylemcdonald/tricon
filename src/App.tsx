@@ -98,6 +98,7 @@ const generateHash = (content: any): string => {
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
+  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState>({
     isDrawing: false,
     triangleMode: null,
@@ -121,6 +122,17 @@ const App: React.FC = () => {
 
     // Clear canvas
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // Draw white background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // Draw background image if exists
+    if (backgroundImage) {
+      ctx.globalAlpha = 0.5;
+      ctx.drawImage(backgroundImage, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      ctx.globalAlpha = 1;
+    }
 
     // Draw grid lines first
     ctx.strokeStyle = '#cccccc';
@@ -193,7 +205,7 @@ const App: React.FC = () => {
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
       ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
     }
-  }, [grid, hoverPosition]);
+  }, [grid, hoverPosition, backgroundImage]);
 
   useEffect(() => {
     drawGrid();
@@ -470,18 +482,34 @@ const App: React.FC = () => {
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/json') {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const loadedGrid = JSON.parse(event.target?.result as string);
-          setGrid(loadedGrid);
-        } catch (error) {
-          console.error('Error loading file:', error);
-        }
-      };
-      reader.readAsText(file);
+    if (file) {
+      if (file.type === 'application/json') {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const loadedGrid = JSON.parse(event.target?.result as string);
+            setGrid(loadedGrid);
+          } catch (error) {
+            console.error('Error loading file:', error);
+          }
+        };
+        reader.readAsText(file);
+      } else if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            setBackgroundImage(img);
+          };
+          img.src = event.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      }
     }
+  };
+
+  const clearBackground = () => {
+    setBackgroundImage(null);
   };
 
   return (
@@ -491,6 +519,7 @@ const App: React.FC = () => {
         <Button onClick={exportAsSVG}>Export SVG</Button>
         <Button onClick={exportAsJSON}>Export JSON</Button>
         <Button onClick={exportAll}>Export All</Button>
+        {backgroundImage && <Button onClick={clearBackground}>Clear Background</Button>}
       </Controls>
       <CanvasContainer>
         <Canvas
