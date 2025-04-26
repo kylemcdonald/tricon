@@ -24,8 +24,6 @@ const GridContainer = styled.div<{ $isDrawing: boolean }>`
   background: white;
   user-select: none;
   position: relative;
-  gap: 1px;
-  background-color: #eee;
   padding: 1px;
 `;
 
