@@ -25,6 +25,8 @@ const CanvasContainer = styled.div`
 const Canvas = styled.canvas`
   display: block;
   cursor: none;
+  width: ${CANVAS_SIZE}px;
+  height: ${CANVAS_SIZE}px;
 `;
 
 const Controls = styled.div`
@@ -82,6 +84,17 @@ const createEmptyGrid = (): Grid => {
   );
 };
 
+const generateHash = (content: any): string => {
+  const str = JSON.stringify(content);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16).slice(0, 8);
+};
+
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
@@ -99,6 +112,12 @@ const App: React.FC = () => {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
 
     // Clear canvas
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
@@ -336,17 +355,69 @@ const App: React.FC = () => {
   }, [drawingState.isDrawing]);
 
   const exportAsPNG = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const hash = generateHash(grid);
+    const exportCanvas = document.createElement('canvas');
+    const exportSize = GRID_SIZE * 32;
+    exportCanvas.width = exportSize;
+    exportCanvas.height = exportSize;
+    const ctx = exportCanvas.getContext('2d');
+    if (!ctx) return;
 
-    canvas.toBlob((blob) => {
+    // Fill with white background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, exportSize, exportSize);
+
+    // Draw black elements
+    grid.forEach((row, i) => {
+      row.forEach((pixel, j) => {
+        const x = j * 32;
+        const y = i * 32;
+
+        if (pixel.color === 'black') {
+          ctx.fillStyle = 'black';
+          ctx.fillRect(x, y, 32, 32);
+        }
+
+        if (pixel.triangle && pixel.triangle.color === 'black') {
+          ctx.fillStyle = 'black';
+          ctx.beginPath();
+          switch (pixel.triangle.orientation) {
+            case 'top-left':
+              ctx.moveTo(x, y);
+              ctx.lineTo(x, y + 32);
+              ctx.lineTo(x + 32, y);
+              break;
+            case 'top-right':
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + 32, y);
+              ctx.lineTo(x + 32, y + 32);
+              break;
+            case 'bottom-left':
+              ctx.moveTo(x, y);
+              ctx.lineTo(x, y + 32);
+              ctx.lineTo(x + 32, y + 32);
+              break;
+            case 'bottom-right':
+              ctx.moveTo(x + 32, y);
+              ctx.lineTo(x, y + 32);
+              ctx.lineTo(x + 32, y + 32);
+              break;
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+      });
+    });
+
+    exportCanvas.toBlob((blob) => {
       if (blob) {
-        saveAs(blob, 'grid-drawing.png');
+        saveAs(blob, `${hash}.png`);
       }
     });
-  }, []);
+  }, [grid]);
 
   const exportAsSVG = useCallback(() => {
+    const hash = generateHash(grid);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', `${CANVAS_SIZE}`);
     svg.setAttribute('height', `${CANVAS_SIZE}`);
@@ -381,13 +452,20 @@ const App: React.FC = () => {
 
     const svgData = new XMLSerializer().serializeToString(svg);
     const blob = new Blob([svgData], { type: 'image/svg+xml' });
-    saveAs(blob, 'grid-drawing.svg');
+    saveAs(blob, `${hash}.svg`);
   }, [grid]);
 
   const exportAsJSON = useCallback(() => {
+    const hash = generateHash(grid);
     const blob = new Blob([JSON.stringify(grid)], { type: 'application/json' });
-    saveAs(blob, 'grid-drawing.json');
+    saveAs(blob, `${hash}.json`);
   }, [grid]);
+
+  const exportAll = useCallback(() => {
+    exportAsPNG();
+    exportAsSVG();
+    exportAsJSON();
+  }, [exportAsPNG, exportAsSVG, exportAsJSON]);
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -412,6 +490,7 @@ const App: React.FC = () => {
         <Button onClick={exportAsPNG}>Export PNG</Button>
         <Button onClick={exportAsSVG}>Export SVG</Button>
         <Button onClick={exportAsJSON}>Export JSON</Button>
+        <Button onClick={exportAll}>Export All</Button>
       </Controls>
       <CanvasContainer>
         <Canvas
