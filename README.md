@@ -18,7 +18,8 @@ A React-based drawing tool that allows users to create pixel art and geometric p
 
 ## Keyboard Controls
 
-- `X`: Toggle between black and white colors
+- `Z`: Draw black pixel
+- `X`: Draw white pixel
 - `Q`: Top-left triangle mode
 - `W`: Top-right triangle mode
 - `A`: Bottom-left triangle mode

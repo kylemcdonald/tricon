@@ -24,6 +24,7 @@ const CanvasContainer = styled.div`
 
 const Canvas = styled.canvas`
   display: block;
+  cursor: none;
 `;
 
 const Controls = styled.div`
@@ -86,11 +87,11 @@ const App: React.FC = () => {
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
   const [drawingState, setDrawingState] = useState<DrawingState>({
     isDrawing: false,
-    currentColor: 'black',
     triangleMode: null,
   });
   const [lastPosition, setLastPosition] = useState<{ row: number; col: number } | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ row: number; col: number } | null>(null);
+  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
 
   const drawGrid = useCallback(() => {
     const canvas = canvasRef.current;
@@ -102,19 +103,35 @@ const App: React.FC = () => {
     // Clear canvas
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    // Draw grid
+    // Draw grid lines first
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 1;
+    
+    // Draw vertical lines
+    for (let i = 0; i <= GRID_SIZE; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * PIXEL_SIZE - 0.5, 0);
+      ctx.lineTo(i * PIXEL_SIZE - 0.5, CANVAS_SIZE);
+      ctx.stroke();
+    }
+    
+    // Draw horizontal lines
+    for (let i = 0; i <= GRID_SIZE; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, i * PIXEL_SIZE - 0.5);
+      ctx.lineTo(CANVAS_SIZE, i * PIXEL_SIZE - 0.5);
+      ctx.stroke();
+    }
+
+    // Draw only black pixels on top
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
         const x = j * PIXEL_SIZE;
         const y = i * PIXEL_SIZE;
 
-        // Draw pixel background
-        ctx.fillStyle = pixel.color;
-        ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
-
-        // Draw red overlay for hovered pixel
-        if (hoverPosition && hoverPosition.row === i && hoverPosition.col === j) {
-          ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        // Only draw if the pixel is black
+        if (pixel.color === 'black') {
+          ctx.fillStyle = 'black';
           ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
         }
 
@@ -149,6 +166,14 @@ const App: React.FC = () => {
         }
       });
     });
+
+    // Draw hover overlay last
+    if (hoverPosition) {
+      const x = hoverPosition.col * PIXEL_SIZE;
+      const y = hoverPosition.row * PIXEL_SIZE;
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
+    }
   }, [grid, hoverPosition]);
 
   useEffect(() => {
@@ -208,9 +233,23 @@ const App: React.FC = () => {
     const pos = getMousePosition(e);
     setHoverPosition(pos);
 
-    if (!drawingState.isDrawing || !lastPosition) return;
     if (!pos) return;
 
+    if (pressedKeys.has('z')) {
+      updatePixel(pos.row, pos.col, 'black');
+    } else if (pressedKeys.has('x')) {
+      updatePixel(pos.row, pos.col, 'white');
+    } else if (pressedKeys.has('s')) {
+      updatePixel(pos.row, pos.col, 'white', 'top-left');
+    } else if (pressedKeys.has('a')) {
+      updatePixel(pos.row, pos.col, 'white', 'top-right');
+    } else if (pressedKeys.has('w')) {
+      updatePixel(pos.row, pos.col, 'white', 'bottom-left');
+    } else if (pressedKeys.has('q')) {
+      updatePixel(pos.row, pos.col, 'white', 'bottom-right');
+    }
+
+    if (!drawingState.isDrawing || !lastPosition) return;
     drawLine(lastPosition.col, lastPosition.row, pos.col, pos.row);
     setLastPosition(pos);
   };
@@ -224,16 +263,16 @@ const App: React.FC = () => {
     setHoverPosition(null);
   };
 
-  const updatePixel = (row: number, col: number) => {
+  const updatePixel = (row: number, col: number, color: PixelColor = 'black', triangleMode: TriangleOrientation | null = null) => {
     setGrid(prev => {
       const newGrid = [...prev];
       const newRow = [...newGrid[row]];
       const newPixel: Pixel = {
-        color: drawingState.triangleMode ? 'white' : drawingState.currentColor,
-        ...(drawingState.triangleMode && {
+        color: triangleMode ? 'white' : color,
+        ...(triangleMode && {
           triangle: {
-            orientation: drawingState.triangleMode,
-            color: drawingState.currentColor,
+            orientation: triangleMode,
+            color: 'black',
           },
         }),
       };
@@ -244,25 +283,33 @@ const App: React.FC = () => {
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'x') {
-      setDrawingState(prev => ({
-        ...prev,
-        currentColor: prev.currentColor === 'black' ? 'white' : 'black',
-      }));
-    } else if (e.key === 's') {
-      setDrawingState(prev => ({ ...prev, triangleMode: 'top-left' }));
-    } else if (e.key === 'a') {
-      setDrawingState(prev => ({ ...prev, triangleMode: 'top-right' }));
-    } else if (e.key === 'w') {
-      setDrawingState(prev => ({ ...prev, triangleMode: 'bottom-left' }));
-    } else if (e.key === 'q') {
-      setDrawingState(prev => ({ ...prev, triangleMode: 'bottom-right' }));
+    if (['z', 'x', 's', 'a', 'w', 'q'].includes(e.key)) {
+      setPressedKeys(prev => new Set(prev).add(e.key));
+      if (hoverPosition) {
+        if (e.key === 'z') {
+          updatePixel(hoverPosition.row, hoverPosition.col, 'black');
+        } else if (e.key === 'x') {
+          updatePixel(hoverPosition.row, hoverPosition.col, 'white');
+        } else if (e.key === 's') {
+          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'top-left');
+        } else if (e.key === 'a') {
+          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'top-right');
+        } else if (e.key === 'w') {
+          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'bottom-left');
+        } else if (e.key === 'q') {
+          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'bottom-right');
+        }
+      }
     }
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
-    if (['s', 'w', 'q', 'a'].includes(e.key)) {
-      setDrawingState(prev => ({ ...prev, triangleMode: null }));
+    if (['z', 'x', 's', 'a', 'w', 'q'].includes(e.key)) {
+      setPressedKeys(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(e.key);
+        return newSet;
+      });
     }
   };
 
@@ -273,7 +320,7 @@ const App: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [hoverPosition, pressedKeys]);
 
   useEffect(() => {
     const handleGlobalMouseUp = () => {
@@ -307,15 +354,17 @@ const App: React.FC = () => {
 
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', `${j * PIXEL_SIZE}`);
-        rect.setAttribute('y', `${i * PIXEL_SIZE}`);
-        rect.setAttribute('width', `${PIXEL_SIZE}`);
-        rect.setAttribute('height', `${PIXEL_SIZE}`);
-        rect.setAttribute('fill', pixel.color);
-        svg.appendChild(rect);
+        if (pixel.color === 'black') {
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', `${j * PIXEL_SIZE}`);
+          rect.setAttribute('y', `${i * PIXEL_SIZE}`);
+          rect.setAttribute('width', `${PIXEL_SIZE}`);
+          rect.setAttribute('height', `${PIXEL_SIZE}`);
+          rect.setAttribute('fill', pixel.color);
+          svg.appendChild(rect);
+        }
 
-        if (pixel.triangle) {
+        if (pixel.triangle && pixel.triangle.color === 'black') {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           const points = {
             'top-left': `M${j * PIXEL_SIZE},${i * PIXEL_SIZE} L${j * PIXEL_SIZE},${(i + 1) * PIXEL_SIZE} L${(j + 1) * PIXEL_SIZE},${i * PIXEL_SIZE} Z`,
@@ -376,11 +425,7 @@ const App: React.FC = () => {
         />
       </CanvasContainer>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-          <span>Current color:</span>
-          <ColorIndicator color={drawingState.currentColor} />
-        </div>
-        <p>Press X to toggle color</p>
+        <p>Press Z to draw black, X to draw white</p>
         <TriangleLegend>
           <TriangleKey>
             <TrianglePreview orientation="bottom-right" color="black" />

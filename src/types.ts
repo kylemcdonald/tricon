@@ -14,6 +14,5 @@ export type Grid = Pixel[][];
 
 export interface DrawingState {
   isDrawing: boolean;
-  currentColor: PixelColor;
   triangleMode: TriangleOrientation | null;
 } 
