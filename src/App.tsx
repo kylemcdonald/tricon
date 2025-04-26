@@ -4,7 +4,8 @@ import { Grid, Pixel, DrawingState, TriangleOrientation, PixelColor } from './ty
 import { saveAs } from 'file-saver';
 
 const GRID_SIZE = 26;
-const PIXEL_SIZE = 12;
+const PIXEL_SIZE = 24;
+const EXPORT_PIXEL_SIZE = 12;
 const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE;
 
 const AppContainer = styled.div`
@@ -431,18 +432,19 @@ const App: React.FC = () => {
   const exportAsSVG = useCallback(() => {
     const hash = generateHash(grid);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', `${CANVAS_SIZE}`);
-    svg.setAttribute('height', `${CANVAS_SIZE}`);
-    svg.setAttribute('viewBox', `0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`);
+    const exportSize = GRID_SIZE * EXPORT_PIXEL_SIZE;
+    svg.setAttribute('width', `${exportSize}`);
+    svg.setAttribute('height', `${exportSize}`);
+    svg.setAttribute('viewBox', `0 0 ${exportSize} ${exportSize}`);
 
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
         if (pixel.color === 'black') {
           const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          rect.setAttribute('x', `${j * PIXEL_SIZE}`);
-          rect.setAttribute('y', `${i * PIXEL_SIZE}`);
-          rect.setAttribute('width', `${PIXEL_SIZE}`);
-          rect.setAttribute('height', `${PIXEL_SIZE}`);
+          rect.setAttribute('x', `${j * EXPORT_PIXEL_SIZE}`);
+          rect.setAttribute('y', `${i * EXPORT_PIXEL_SIZE}`);
+          rect.setAttribute('width', `${EXPORT_PIXEL_SIZE}`);
+          rect.setAttribute('height', `${EXPORT_PIXEL_SIZE}`);
           rect.setAttribute('fill', pixel.color);
           svg.appendChild(rect);
         }
@@ -450,10 +452,10 @@ const App: React.FC = () => {
         if (pixel.triangle && pixel.triangle.color === 'black') {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           const points = {
-            'top-left': `M${j * PIXEL_SIZE},${i * PIXEL_SIZE} L${j * PIXEL_SIZE},${(i + 1) * PIXEL_SIZE} L${(j + 1) * PIXEL_SIZE},${i * PIXEL_SIZE} Z`,
-            'top-right': `M${j * PIXEL_SIZE},${i * PIXEL_SIZE} L${(j + 1) * PIXEL_SIZE},${i * PIXEL_SIZE} L${(j + 1) * PIXEL_SIZE},${(i + 1) * PIXEL_SIZE} Z`,
-            'bottom-left': `M${j * PIXEL_SIZE},${i * PIXEL_SIZE} L${j * PIXEL_SIZE},${(i + 1) * PIXEL_SIZE} L${(j + 1) * PIXEL_SIZE},${(i + 1) * PIXEL_SIZE} Z`,
-            'bottom-right': `M${(j + 1) * PIXEL_SIZE},${(i + 1) * PIXEL_SIZE} L${j * PIXEL_SIZE},${(i + 1) * PIXEL_SIZE} L${(j + 1) * PIXEL_SIZE},${i * PIXEL_SIZE} Z`,
+            'top-left': `M${j * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} Z`,
+            'top-right': `M${j * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} Z`,
+            'bottom-left': `M${j * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} Z`,
+            'bottom-right': `M${(j + 1) * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} Z`,
           };
           path.setAttribute('d', points[pixel.triangle.orientation]);
           path.setAttribute('fill', pixel.triangle.color);
@@ -512,6 +514,21 @@ const App: React.FC = () => {
     setBackgroundImage(null);
   };
 
+  const invertPixels = () => {
+    setGrid(prev => prev.map(row => 
+      row.map(pixel => ({
+        ...pixel,
+        color: pixel.color === 'black' ? 'white' : 'black',
+        ...(pixel.triangle && {
+          triangle: {
+            ...pixel.triangle,
+            color: pixel.triangle.color === 'black' ? 'white' : 'black'
+          }
+        })
+      }))
+    ));
+  };
+
   return (
     <AppContainer onDragOver={(e) => e.preventDefault()} onDrop={handleFileDrop}>
       <Controls>
@@ -552,6 +569,7 @@ const App: React.FC = () => {
             <span>S</span>
           </TriangleKey>
         </TriangleLegend>
+        <Button onClick={invertPixels} style={{ marginTop: '20px' }}>Invert Colors</Button>
       </div>
     </AppContainer>
   );
