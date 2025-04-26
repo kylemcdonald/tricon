@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { Grid, Pixel, DrawingState, TriangleOrientation, PixelColor } from './types';
-import { toPng } from 'html-to-image';
 import { saveAs } from 'file-saver';
 
 const GRID_SIZE = 26;
 const PIXEL_SIZE = 12;
+const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE;
 
 const AppContainer = styled.div`
   display: flex;
@@ -15,46 +15,15 @@ const AppContainer = styled.div`
   user-select: none;
 `;
 
-const GridContainer = styled.div<{ $isDrawing: boolean }>`
-  display: grid;
-  grid-template-columns: repeat(${GRID_SIZE}, ${PIXEL_SIZE}px);
-  grid-template-rows: repeat(${GRID_SIZE}, ${PIXEL_SIZE}px);
-  border: 1px solid #ccc;
+const CanvasContainer = styled.div`
+  position: relative;
   margin: 20px;
+  border: 1px solid #ccc;
   background: white;
-  user-select: none;
-  position: relative;
-  padding: 1px;
 `;
 
-const PixelElement = styled.div.attrs<{ color: string }>(props => ({
-  style: {
-    backgroundColor: props.color,
-  }
-}))`
-  width: ${PIXEL_SIZE}px;
-  height: ${PIXEL_SIZE}px;
-  position: relative;
-  user-select: none;
-  box-sizing: border-box;
-  cursor: none;
-  * {
-    cursor: none;
-  }
-`;
-
-const Triangle = styled.div.attrs<{ orientation: string, color: string }>(props => ({
-  style: {
-    clipPath: props.orientation === 'top-left' ? 'polygon(0 0, 0 100%, 100% 0)' :
-              props.orientation === 'top-right' ? 'polygon(0 0, 100% 0, 100% 100%)' :
-              props.orientation === 'bottom-left' ? 'polygon(0 0, 0 100%, 100% 100%)' :
-              props.orientation === 'bottom-right' ? 'polygon(0 100%, 100% 0, 100% 100%)' : '',
-    backgroundColor: props.color,
-  }
-}))`
-  position: absolute;
-  width: 100%;
-  height: 100%;
+const Canvas = styled.canvas`
+  display: block;
 `;
 
 const Controls = styled.div`
@@ -66,42 +35,6 @@ const Controls = styled.div`
 const Button = styled.button`
   padding: 8px 16px;
   cursor: pointer;
-`;
-
-const TriangleHypotenuse = styled.div.attrs<{ $orientation: TriangleOrientation }>(props => ({
-  style: {
-    clipPath: props.$orientation === 'top-left' ? 'polygon(0 0, 0 100%, 100% 0)' :
-             props.$orientation === 'top-right' ? 'polygon(0 0, 100% 0, 100% 100%)' :
-             props.$orientation === 'bottom-left' ? 'polygon(0 0, 0 100%, 100% 100%)' :
-             props.$orientation === 'bottom-right' ? 'polygon(0 100%, 100% 0, 100% 100%)' : '',
-  }
-}))`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border: 1px solid red;
-  pointer-events: none;
-  z-index: 2;
-`;
-
-const HoverOverlay = styled.div.attrs<{ $row: number; $col: number; $triangleMode: TriangleOrientation | null }>(props => ({
-  style: {
-    top: `${props.$row * (PIXEL_SIZE + 1)}px`,
-    left: `${props.$col * (PIXEL_SIZE + 1)}px`,
-  }
-}))`
-  position: absolute;
-  width: ${PIXEL_SIZE}px;
-  height: ${PIXEL_SIZE}px;
-  border: 1px solid red;
-  pointer-events: none;
-  z-index: 1;
-  background-color: ${props => props.$triangleMode ? 'rgba(255, 0, 0, 0.2)' : 'transparent'};
-  clip-path: ${props => props.$triangleMode ? 
-    (props.$triangleMode === 'top-left' ? 'polygon(0 0, 0 100%, 100% 0)' :
-     props.$triangleMode === 'top-right' ? 'polygon(0 0, 100% 0, 100% 100%)' :
-     props.$triangleMode === 'bottom-left' ? 'polygon(0 0, 0 100%, 100% 100%)' :
-     props.$triangleMode === 'bottom-right' ? 'polygon(0 100%, 100% 0, 100% 100%)' : '') : ''};
 `;
 
 const ColorIndicator = styled.div.attrs<{ color: string }>(props => ({
@@ -149,6 +82,7 @@ const createEmptyGrid = (): Grid => {
 };
 
 const App: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
   const [drawingState, setDrawingState] = useState<DrawingState>({
     isDrawing: false,
@@ -156,9 +90,88 @@ const App: React.FC = () => {
     triangleMode: null,
   });
   const [lastPosition, setLastPosition] = useState<{ row: number; col: number } | null>(null);
-  const [hoveredPixel, setHoveredPixel] = useState<{ row: number; col: number } | null>(null);
-  const [temporaryColor, setTemporaryColor] = useState<PixelColor | null>(null);
-  const [isCursorHidden, setIsCursorHidden] = useState(false);
+  const [hoverPosition, setHoverPosition] = useState<{ row: number; col: number } | null>(null);
+
+  const drawGrid = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // Draw grid
+    grid.forEach((row, i) => {
+      row.forEach((pixel, j) => {
+        const x = j * PIXEL_SIZE;
+        const y = i * PIXEL_SIZE;
+
+        // Draw pixel background
+        ctx.fillStyle = pixel.color;
+        ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
+
+        // Draw red overlay for hovered pixel
+        if (hoverPosition && hoverPosition.row === i && hoverPosition.col === j) {
+          ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+          ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
+        }
+
+        // Draw triangle if present
+        if (pixel.triangle) {
+          ctx.fillStyle = pixel.triangle.color;
+          ctx.beginPath();
+          switch (pixel.triangle.orientation) {
+            case 'top-left':
+              ctx.moveTo(x, y);
+              ctx.lineTo(x, y + PIXEL_SIZE);
+              ctx.lineTo(x + PIXEL_SIZE, y);
+              break;
+            case 'top-right':
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + PIXEL_SIZE, y);
+              ctx.lineTo(x + PIXEL_SIZE, y + PIXEL_SIZE);
+              break;
+            case 'bottom-left':
+              ctx.moveTo(x, y);
+              ctx.lineTo(x, y + PIXEL_SIZE);
+              ctx.lineTo(x + PIXEL_SIZE, y + PIXEL_SIZE);
+              break;
+            case 'bottom-right':
+              ctx.moveTo(x + PIXEL_SIZE, y);
+              ctx.lineTo(x, y + PIXEL_SIZE);
+              ctx.lineTo(x + PIXEL_SIZE, y + PIXEL_SIZE);
+              break;
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+      });
+    });
+  }, [grid, hoverPosition]);
+
+  useEffect(() => {
+    drawGrid();
+  }, [drawGrid]);
+
+  const getMousePosition = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const col = Math.floor(x / PIXEL_SIZE);
+    const row = Math.floor(y / PIXEL_SIZE);
+
+    if (col < 0 || col >= GRID_SIZE || row < 0 || row >= GRID_SIZE) {
+      return null;
+    }
+
+    return { row, col };
+  };
 
   const drawLine = (x0: number, y0: number, x1: number, y1: number) => {
     const dx = Math.abs(x1 - x0);
@@ -182,22 +195,33 @@ const App: React.FC = () => {
     }
   };
 
-  const handleMouseDown = (row: number, col: number) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const pos = getMousePosition(e);
+    if (!pos) return;
+
     setDrawingState(prev => ({ ...prev, isDrawing: true }));
-    setLastPosition({ row, col });
-    updatePixel(row, col);
+    setLastPosition(pos);
+    updatePixel(pos.row, pos.col);
   };
 
-  const handleMouseMove = (row: number, col: number) => {
-    if (drawingState.isDrawing && lastPosition) {
-      drawLine(lastPosition.col, lastPosition.row, col, row);
-      setLastPosition({ row, col });
-    }
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const pos = getMousePosition(e);
+    setHoverPosition(pos);
+
+    if (!drawingState.isDrawing || !lastPosition) return;
+    if (!pos) return;
+
+    drawLine(lastPosition.col, lastPosition.row, pos.col, pos.row);
+    setLastPosition(pos);
   };
 
   const handleMouseUp = () => {
     setDrawingState(prev => ({ ...prev, isDrawing: false }));
     setLastPosition(null);
+  };
+
+  const handleMouseLeave = () => {
+    setHoverPosition(null);
   };
 
   const updatePixel = (row: number, col: number) => {
@@ -264,40 +288,22 @@ const App: React.FC = () => {
     };
   }, [drawingState.isDrawing]);
 
-  useEffect(() => {
-    if (isCursorHidden) {
-      document.body.style.cursor = 'none';
-    } else {
-      document.body.style.cursor = 'default';
-    }
-    return () => {
-      document.body.style.cursor = 'default';
-    };
-  }, [isCursorHidden]);
-
   const exportAsPNG = useCallback(() => {
-    const gridElement = document.getElementById('grid');
-    if (gridElement) {
-      toPng(gridElement, { 
-        width: GRID_SIZE * PIXEL_SIZE,
-        height: GRID_SIZE * PIXEL_SIZE,
-        style: {
-          transform: 'none',
-          margin: '0',
-          background: 'white'
-        }
-      })
-        .then((dataUrl) => {
-          saveAs(dataUrl, 'grid-drawing.png');
-        });
-    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.toBlob((blob) => {
+      if (blob) {
+        saveAs(blob, 'grid-drawing.png');
+      }
+    });
   }, []);
 
   const exportAsSVG = useCallback(() => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', `${GRID_SIZE * PIXEL_SIZE * 10}`);
-    svg.setAttribute('height', `${GRID_SIZE * PIXEL_SIZE * 10}`);
-    svg.setAttribute('viewBox', `0 0 ${GRID_SIZE * PIXEL_SIZE} ${GRID_SIZE * PIXEL_SIZE}`);
+    svg.setAttribute('width', `${CANVAS_SIZE}`);
+    svg.setAttribute('height', `${CANVAS_SIZE}`);
+    svg.setAttribute('viewBox', `0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}`);
 
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
@@ -358,53 +364,17 @@ const App: React.FC = () => {
         <Button onClick={exportAsSVG}>Export SVG</Button>
         <Button onClick={exportAsJSON}>Export JSON</Button>
       </Controls>
-      <GridContainer 
-        id="grid" 
-        $isDrawing={drawingState.isDrawing}
-        onMouseEnter={() => setIsCursorHidden(true)}
-        onMouseLeave={() => setIsCursorHidden(false)}
-      >
-        {grid.map((row, i) =>
-          row.map((pixel, j) => (
-            <PixelElement
-              key={`${i}-${j}`}
-              color={pixel.color}
-              onMouseDown={() => handleMouseDown(i, j)}
-              onMouseMove={() => handleMouseMove(i, j)}
-              onMouseUp={handleMouseUp}
-              onMouseEnter={() => setHoveredPixel({ row: i, col: j })}
-              onMouseLeave={() => setHoveredPixel(null)}
-            >
-              {pixel.triangle && (
-                <Triangle
-                  orientation={pixel.triangle.orientation}
-                  color={pixel.triangle.color}
-                />
-              )}
-            </PixelElement>
-          ))
-        )}
-        {hoveredPixel && (
-          <>
-            <HoverOverlay
-              $row={hoveredPixel.row}
-              $col={hoveredPixel.col}
-              $triangleMode={drawingState.triangleMode}
-            />
-            {drawingState.triangleMode && (
-              <TriangleHypotenuse
-                $orientation={drawingState.triangleMode}
-                style={{
-                  top: `${hoveredPixel.row * (PIXEL_SIZE + 1)}px`,
-                  left: `${hoveredPixel.col * (PIXEL_SIZE + 1)}px`,
-                  width: `${PIXEL_SIZE}px`,
-                  height: `${PIXEL_SIZE}px`,
-                }}
-              />
-            )}
-          </>
-        )}
-      </GridContainer>
+      <CanvasContainer>
+        <Canvas
+          ref={canvasRef}
+          width={CANVAS_SIZE}
+          height={CANVAS_SIZE}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+        />
+      </CanvasContainer>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
           <span>Current color:</span>
