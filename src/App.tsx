@@ -24,6 +24,9 @@ const GridContainer = styled.div<{ $isDrawing: boolean }>`
   background: white;
   user-select: none;
   position: relative;
+  gap: 1px;
+  background-color: #eee;
+  padding: 1px;
 `;
 
 const PixelElement = styled.div.attrs<{ color: string }>(props => ({
@@ -85,13 +88,13 @@ const TriangleHypotenuse = styled.div.attrs<{ $orientation: TriangleOrientation 
 
 const HoverOverlay = styled.div.attrs<{ $row: number; $col: number; $triangleMode: TriangleOrientation | null }>(props => ({
   style: {
-    top: `${props.$row * PIXEL_SIZE}px`,
-    left: `${props.$col * PIXEL_SIZE}px`,
+    top: `${props.$row * (PIXEL_SIZE + 1)}px`,
+    left: `${props.$col * (PIXEL_SIZE + 1)}px`,
   }
 }))`
   position: absolute;
-  width: ${PIXEL_SIZE - 2}px;
-  height: ${PIXEL_SIZE - 2}px;
+  width: ${PIXEL_SIZE}px;
+  height: ${PIXEL_SIZE}px;
   border: 1px solid red;
   pointer-events: none;
   z-index: 1;
@@ -117,6 +120,7 @@ const ColorIndicator = styled.div.attrs<{ color: string }>(props => ({
 const TriangleLegend = styled.div`
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
   gap: 10px;
   margin-top: 10px;
 `;
@@ -223,19 +227,19 @@ const App: React.FC = () => {
         ...prev,
         currentColor: prev.currentColor === 'black' ? 'white' : 'black',
       }));
-    } else if (e.key === 'q') {
-      setDrawingState(prev => ({ ...prev, triangleMode: 'top-left' }));
-    } else if (e.key === 'w') {
-      setDrawingState(prev => ({ ...prev, triangleMode: 'top-right' }));
-    } else if (e.key === 'a') {
-      setDrawingState(prev => ({ ...prev, triangleMode: 'bottom-left' }));
     } else if (e.key === 's') {
+      setDrawingState(prev => ({ ...prev, triangleMode: 'top-left' }));
+    } else if (e.key === 'a') {
+      setDrawingState(prev => ({ ...prev, triangleMode: 'top-right' }));
+    } else if (e.key === 'w') {
+      setDrawingState(prev => ({ ...prev, triangleMode: 'bottom-left' }));
+    } else if (e.key === 'q') {
       setDrawingState(prev => ({ ...prev, triangleMode: 'bottom-right' }));
     }
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
-    if (['q', 'w', 'a', 's'].includes(e.key)) {
+    if (['s', 'w', 'q', 'a'].includes(e.key)) {
       setDrawingState(prev => ({ ...prev, triangleMode: null }));
     }
   };
@@ -393,10 +397,10 @@ const App: React.FC = () => {
               <TriangleHypotenuse
                 $orientation={drawingState.triangleMode}
                 style={{
-                  top: `${hoveredPixel.row * PIXEL_SIZE}px`,
-                  left: `${hoveredPixel.col * PIXEL_SIZE}px`,
-                  width: `${PIXEL_SIZE - 2}px`,
-                  height: `${PIXEL_SIZE - 2}px`,
+                  top: `${hoveredPixel.row * (PIXEL_SIZE + 1)}px`,
+                  left: `${hoveredPixel.col * (PIXEL_SIZE + 1)}px`,
+                  width: `${PIXEL_SIZE}px`,
+                  height: `${PIXEL_SIZE}px`,
                 }}
               />
             )}
@@ -411,20 +415,20 @@ const App: React.FC = () => {
         <p>Press X to toggle color</p>
         <TriangleLegend>
           <TriangleKey>
-            <TrianglePreview orientation="top-left" color="black" />
-            <span>Q - Top Left</span>
-          </TriangleKey>
-          <TriangleKey>
-            <TrianglePreview orientation="top-right" color="black" />
-            <span>W - Top Right</span>
+            <TrianglePreview orientation="bottom-right" color="black" />
+            <span>Q</span>
           </TriangleKey>
           <TriangleKey>
             <TrianglePreview orientation="bottom-left" color="black" />
-            <span>A - Bottom Left</span>
+            <span>W</span>
           </TriangleKey>
           <TriangleKey>
-            <TrianglePreview orientation="bottom-right" color="black" />
-            <span>S - Bottom Right</span>
+            <TrianglePreview orientation="top-right" color="black" />
+            <span>A</span>
+          </TriangleKey>
+          <TriangleKey>
+            <TrianglePreview orientation="top-left" color="black" />
+            <span>S</span>
           </TriangleKey>
         </TriangleLegend>
       </div>
