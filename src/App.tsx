@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { Grid, Pixel, DrawingState, TriangleOrientation, PixelColor } from './types';
+import { Grid, Pixel, DrawingState, TriangleOrientation, PixelColor, HoverRegion } from './types';
 import { saveAs } from 'file-saver';
 
 const GRID_SIZE = 26;
@@ -71,9 +71,11 @@ const App: React.FC = () => {
   const [drawingState, setDrawingState] = useState<DrawingState>({
     isDrawing: false,
     triangleMode: null,
+    hoverRegion: null,
   });
-  const [lastPosition, setLastPosition] = useState<{ row: number; col: number } | null>(null);
-  const [hoverPosition, setHoverPosition] = useState<{ row: number; col: number } | null>(null);
+  const [lastPosition, setLastPosition] = useState<{ row: number; col: number; region: HoverRegion } | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ row: number; col: number; region: HoverRegion } | null>(null);
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -137,6 +139,29 @@ const App: React.FC = () => {
       ctx.stroke();
     }
 
+    // Draw diagonal X-shaped grid within each cell
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 0.5;
+
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        const x = j * pixelSize;
+        const y = i * pixelSize;
+
+        // Draw diagonal from top-left to bottom-right
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + pixelSize, y + pixelSize);
+        ctx.stroke();
+
+        // Draw diagonal from top-right to bottom-left
+        ctx.beginPath();
+        ctx.moveTo(x + pixelSize, y);
+        ctx.lineTo(x, y + pixelSize);
+        ctx.stroke();
+      }
+    }
+
     // Draw only black pixels on top
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
@@ -186,9 +211,46 @@ const App: React.FC = () => {
       const x = hoverPosition.col * pixelSize;
       const y = hoverPosition.row * pixelSize;
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-      ctx.fillRect(x, y, pixelSize, pixelSize);
+      
+      if (hoverPosition.region === 'center') {
+        ctx.fillRect(x, y, pixelSize, pixelSize);
+      } else {
+        ctx.beginPath();
+        switch (hoverPosition.region) {
+          case 'top-left':
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + pixelSize);
+            ctx.lineTo(x + pixelSize, y);
+            break;
+          case 'top-right':
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + pixelSize, y);
+            ctx.lineTo(x + pixelSize, y + pixelSize);
+            break;
+          case 'bottom-left':
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + pixelSize);
+            ctx.lineTo(x + pixelSize, y + pixelSize);
+            break;
+          case 'bottom-right':
+            ctx.moveTo(x + pixelSize, y);
+            ctx.lineTo(x, y + pixelSize);
+            ctx.lineTo(x + pixelSize, y + pixelSize);
+            break;
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
     }
-  }, [grid, hoverPosition, backgroundImage, pixelSize]);
+
+    // Draw cursor dot
+    if (mousePosition) {
+      ctx.fillStyle = 'black';
+      ctx.beginPath();
+      ctx.arc(mousePosition.x, mousePosition.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, [grid, hoverPosition, backgroundImage, pixelSize, mousePosition]);
 
   useEffect(() => {
     drawGrid();
@@ -209,7 +271,25 @@ const App: React.FC = () => {
       return null;
     }
 
-    return { row, col };
+    // Calculate relative position within the cell
+    const cellX = (x % pixelSize) / pixelSize;
+    const cellY = (y % pixelSize) / pixelSize;
+
+    // Determine which region the mouse is in
+    let region: HoverRegion;
+    if (cellX + cellY < 0.5) {
+      region = 'top-left';
+    } else if (cellX + cellY > 1.5) {
+      region = 'bottom-right';
+    } else if (cellX - cellY > 0.5) {
+      region = 'top-right';
+    } else if (cellY - cellX > 0.5) {
+      region = 'bottom-left';
+    } else {
+      region = 'center';
+    }
+
+    return { row, col, region };
   };
 
   const drawLine = (x0: number, y0: number, x1: number, y1: number) => {
@@ -238,34 +318,60 @@ const App: React.FC = () => {
     const pos = getMousePosition(e);
     if (!pos) return;
 
-    setDrawingState(prev => ({ ...prev, isDrawing: true }));
+    setDrawingState(prev => ({ ...prev, isDrawing: true, hoverRegion: pos.region }));
     setLastPosition(pos);
-    updatePixel(pos.row, pos.col);
+    setHoverPosition(pos);
+    
+    if (pos.region === 'center') {
+      updatePixel(pos.row, pos.col, 'black');
+    } else {
+      updatePixel(pos.row, pos.col, 'white', pos.region);
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setMousePosition({ x, y });
+
     const pos = getMousePosition(e);
-    setHoverPosition(pos);
+    
+    // Update hover position based on pressed keys
+    if (pos) {
+      if (drawingState.isDrawing && lastPosition) {
+        setHoverPosition({ ...pos, region: lastPosition.region });
+      } else {
+        let region: HoverRegion = pos.region;
+        if (pressedKeys.has('z') || pressedKeys.has('x')) {
+          region = 'center';
+        } else if (pressedKeys.has('q')) {
+          region = 'bottom-right';
+        } else if (pressedKeys.has('w')) {
+          region = 'bottom-left';
+        } else if (pressedKeys.has('a')) {
+          region = 'top-right';
+        } else if (pressedKeys.has('s')) {
+          region = 'top-left';
+        }
+        setHoverPosition({ ...pos, region });
+      }
+    }
+    
+    drawGrid();
 
     if (!pos) return;
 
-    if (pressedKeys.has('z')) {
-      updatePixel(pos.row, pos.col, 'black');
-    } else if (pressedKeys.has('x')) {
-      updatePixel(pos.row, pos.col, 'white');
-    } else if (pressedKeys.has('s')) {
-      updatePixel(pos.row, pos.col, 'white', 'top-left');
-    } else if (pressedKeys.has('a')) {
-      updatePixel(pos.row, pos.col, 'white', 'top-right');
-    } else if (pressedKeys.has('w')) {
-      updatePixel(pos.row, pos.col, 'white', 'bottom-left');
-    } else if (pressedKeys.has('q')) {
-      updatePixel(pos.row, pos.col, 'white', 'bottom-right');
+    if (drawingState.isDrawing && lastPosition) {
+      if (lastPosition.region === 'center') {
+        updatePixel(pos.row, pos.col, 'black');
+      } else {
+        updatePixel(pos.row, pos.col, 'white', lastPosition.region);
+      }
     }
-
-    if (!drawingState.isDrawing || !lastPosition) return;
-    drawLine(lastPosition.col, lastPosition.row, pos.col, pos.row);
-    setLastPosition(pos);
   };
 
   const handleMouseUp = () => {
@@ -275,6 +381,7 @@ const App: React.FC = () => {
 
   const handleMouseLeave = () => {
     setHoverPosition(null);
+    setMousePosition(null);
   };
 
   const updatePixel = useCallback((row: number, col: number, color: PixelColor = 'black', triangleMode: TriangleOrientation | null = null) => {
@@ -300,6 +407,22 @@ const App: React.FC = () => {
     if (['z', 'x', 's', 'a', 'w', 'q'].includes(e.key)) {
       setPressedKeys(prev => new Set(prev).add(e.key));
       if (hoverPosition) {
+        let region: HoverRegion;
+        if (e.key === 'z' || e.key === 'x') {
+          region = 'center';
+        } else if (e.key === 'q') {
+          region = 'bottom-right';
+        } else if (e.key === 'w') {
+          region = 'bottom-left';
+        } else if (e.key === 'a') {
+          region = 'top-right';
+        } else if (e.key === 's') {
+          region = 'top-left';
+        } else {
+          region = hoverPosition.region;
+        }
+        setHoverPosition({ ...hoverPosition, region });
+
         if (e.key === 'z') {
           updatePixel(hoverPosition.row, hoverPosition.col, 'black');
         } else if (e.key === 'x') {
