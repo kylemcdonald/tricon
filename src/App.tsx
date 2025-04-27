@@ -4,79 +4,46 @@ import { Grid, Pixel, DrawingState, TriangleOrientation, PixelColor } from './ty
 import { saveAs } from 'file-saver';
 
 const GRID_SIZE = 26;
-const PIXEL_SIZE = 24;
 const EXPORT_PIXEL_SIZE = 12;
-const CANVAS_SIZE = GRID_SIZE * PIXEL_SIZE;
 
 const AppContainer = styled.div`
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 20px;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 0 20px;
   user-select: none;
+  gap: 20px;
+`;
+
+const Controls = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 150px;
+  position: fixed;
+  left: 20px;
+  top: 20px;
 `;
 
 const CanvasContainer = styled.div`
   position: relative;
-  margin: 20px;
   border: 1px solid #ccc;
   background: white;
+  margin: 0 auto;
 `;
 
 const Canvas = styled.canvas`
   display: block;
   cursor: none;
-  width: ${CANVAS_SIZE}px;
-  height: ${CANVAS_SIZE}px;
-`;
-
-const Controls = styled.div`
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  width: ${props => props.width}px;
+  height: ${props => props.height}px;
 `;
 
 const Button = styled.button`
   padding: 8px 16px;
   cursor: pointer;
-`;
-
-const ColorIndicator = styled.div.attrs<{ color: string }>(props => ({
-  style: {
-    backgroundColor: props.color,
-  }
-}))`
-  width: 24px;
-  height: 24px;
-  border: 2px solid #333;
-  margin: 0 10px;
-`;
-
-const TriangleLegend = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 10px;
-  margin-top: 10px;
-`;
-
-const TriangleKey = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 5px;
-`;
-
-const TrianglePreview = styled.div.attrs<{ orientation: string, color: string }>(props => ({
-  style: {
-    clipPath: props.orientation === 'top-left' ? 'polygon(0 0, 0 100%, 100% 0)' :
-              props.orientation === 'top-right' ? 'polygon(0 0, 100% 0, 100% 100%)' :
-              props.orientation === 'bottom-left' ? 'polygon(0 0, 0 100%, 100% 100%)' :
-              props.orientation === 'bottom-right' ? 'polygon(0 100%, 100% 0, 100% 100%)' : '',
-    backgroundColor: props.color,
-  }
-}))`
-  width: 16px;
-  height: 16px;
 `;
 
 const createEmptyGrid = (): Grid => {
@@ -100,6 +67,7 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  const [pixelSize, setPixelSize] = useState<number>(32);
   const [drawingState, setDrawingState] = useState<DrawingState>({
     isDrawing: false,
     triangleMode: null,
@@ -107,6 +75,20 @@ const App: React.FC = () => {
   const [lastPosition, setLastPosition] = useState<{ row: number; col: number } | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ row: number; col: number } | null>(null);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const updatePixelSize = () => {
+      const windowHeight = window.innerHeight;
+      const newPixelSize = Math.floor((windowHeight - 100) / GRID_SIZE);
+      setPixelSize(newPixelSize);
+    };
+
+    updatePixelSize();
+    window.addEventListener('resize', updatePixelSize);
+    return () => window.removeEventListener('resize', updatePixelSize);
+  }, []);
+
+  const canvasSize = GRID_SIZE * pixelSize;
 
   const drawGrid = useCallback(() => {
     const canvas = canvasRef.current;
@@ -122,16 +104,16 @@ const App: React.FC = () => {
     ctx.scale(dpr, dpr);
 
     // Clear canvas
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.clearRect(0, 0, canvasSize, canvasSize);
 
     // Draw white background
     ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
 
     // Draw background image if exists
     if (backgroundImage) {
       ctx.globalAlpha = 0.5;
-      ctx.drawImage(backgroundImage, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      ctx.drawImage(backgroundImage, 0, 0, canvasSize, canvasSize);
       ctx.globalAlpha = 1;
     }
 
@@ -142,29 +124,29 @@ const App: React.FC = () => {
     // Draw vertical lines
     for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath();
-      ctx.moveTo(i * PIXEL_SIZE - 0.5, 0);
-      ctx.lineTo(i * PIXEL_SIZE - 0.5, CANVAS_SIZE);
+      ctx.moveTo(i * pixelSize - 0.5, 0);
+      ctx.lineTo(i * pixelSize - 0.5, canvasSize);
       ctx.stroke();
     }
     
     // Draw horizontal lines
     for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath();
-      ctx.moveTo(0, i * PIXEL_SIZE - 0.5);
-      ctx.lineTo(CANVAS_SIZE, i * PIXEL_SIZE - 0.5);
+      ctx.moveTo(0, i * pixelSize - 0.5);
+      ctx.lineTo(canvasSize, i * pixelSize - 0.5);
       ctx.stroke();
     }
 
     // Draw only black pixels on top
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
-        const x = j * PIXEL_SIZE;
-        const y = i * PIXEL_SIZE;
+        const x = j * pixelSize;
+        const y = i * pixelSize;
 
         // Only draw if the pixel is black
         if (pixel.color === 'black') {
           ctx.fillStyle = 'black';
-          ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
+          ctx.fillRect(x, y, pixelSize, pixelSize);
         }
 
         // Draw triangle if present
@@ -174,23 +156,23 @@ const App: React.FC = () => {
           switch (pixel.triangle.orientation) {
             case 'top-left':
               ctx.moveTo(x, y);
-              ctx.lineTo(x, y + PIXEL_SIZE);
-              ctx.lineTo(x + PIXEL_SIZE, y);
+              ctx.lineTo(x, y + pixelSize);
+              ctx.lineTo(x + pixelSize, y);
               break;
             case 'top-right':
               ctx.moveTo(x, y);
-              ctx.lineTo(x + PIXEL_SIZE, y);
-              ctx.lineTo(x + PIXEL_SIZE, y + PIXEL_SIZE);
+              ctx.lineTo(x + pixelSize, y);
+              ctx.lineTo(x + pixelSize, y + pixelSize);
               break;
             case 'bottom-left':
               ctx.moveTo(x, y);
-              ctx.lineTo(x, y + PIXEL_SIZE);
-              ctx.lineTo(x + PIXEL_SIZE, y + PIXEL_SIZE);
+              ctx.lineTo(x, y + pixelSize);
+              ctx.lineTo(x + pixelSize, y + pixelSize);
               break;
             case 'bottom-right':
-              ctx.moveTo(x + PIXEL_SIZE, y);
-              ctx.lineTo(x, y + PIXEL_SIZE);
-              ctx.lineTo(x + PIXEL_SIZE, y + PIXEL_SIZE);
+              ctx.moveTo(x + pixelSize, y);
+              ctx.lineTo(x, y + pixelSize);
+              ctx.lineTo(x + pixelSize, y + pixelSize);
               break;
           }
           ctx.closePath();
@@ -201,12 +183,12 @@ const App: React.FC = () => {
 
     // Draw hover overlay last
     if (hoverPosition) {
-      const x = hoverPosition.col * PIXEL_SIZE;
-      const y = hoverPosition.row * PIXEL_SIZE;
+      const x = hoverPosition.col * pixelSize;
+      const y = hoverPosition.row * pixelSize;
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-      ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE);
+      ctx.fillRect(x, y, pixelSize, pixelSize);
     }
-  }, [grid, hoverPosition, backgroundImage]);
+  }, [grid, hoverPosition, backgroundImage, pixelSize]);
 
   useEffect(() => {
     drawGrid();
@@ -220,8 +202,8 @@ const App: React.FC = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const col = Math.floor(x / PIXEL_SIZE);
-    const row = Math.floor(y / PIXEL_SIZE);
+    const col = Math.floor(x / pixelSize);
+    const row = Math.floor(y / pixelSize);
 
     if (col < 0 || col >= GRID_SIZE || row < 0 || row >= GRID_SIZE) {
       return null;
@@ -295,7 +277,7 @@ const App: React.FC = () => {
     setHoverPosition(null);
   };
 
-  const updatePixel = (row: number, col: number, color: PixelColor = 'black', triangleMode: TriangleOrientation | null = null) => {
+  const updatePixel = useCallback((row: number, col: number, color: PixelColor = 'black', triangleMode: TriangleOrientation | null = null) => {
     setGrid(prev => {
       const newGrid = [...prev];
       const newRow = [...newGrid[row]];
@@ -312,9 +294,9 @@ const App: React.FC = () => {
       newGrid[row] = newRow;
       return newGrid;
     });
-  };
+  }, []);
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (['z', 'x', 's', 'a', 'w', 'q'].includes(e.key)) {
       setPressedKeys(prev => new Set(prev).add(e.key));
       if (hoverPosition) {
@@ -333,9 +315,9 @@ const App: React.FC = () => {
         }
       }
     }
-  };
+  }, [hoverPosition, updatePixel]);
 
-  const handleKeyUp = (e: KeyboardEvent) => {
+  const handleKeyUp = useCallback((e: KeyboardEvent) => {
     if (['z', 'x', 's', 'a', 'w', 'q'].includes(e.key)) {
       setPressedKeys(prev => {
         const newSet = new Set(prev);
@@ -343,7 +325,7 @@ const App: React.FC = () => {
         return newSet;
       });
     }
-  };
+  }, []);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -352,7 +334,7 @@ const App: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [hoverPosition, pressedKeys]);
+  }, [handleKeyDown, handleKeyUp]);
 
   useEffect(() => {
     const handleGlobalMouseUp = () => {
@@ -537,40 +519,19 @@ const App: React.FC = () => {
         <Button onClick={exportAsJSON}>Export JSON</Button>
         <Button onClick={exportAll}>Export All</Button>
         {backgroundImage && <Button onClick={clearBackground}>Clear Background</Button>}
+        <Button onClick={invertPixels}>Invert Colors</Button>
       </Controls>
       <CanvasContainer>
         <Canvas
           ref={canvasRef}
-          width={CANVAS_SIZE}
-          height={CANVAS_SIZE}
+          width={canvasSize}
+          height={canvasSize}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         />
       </CanvasContainer>
-      <div>
-        <p>Press Z to draw black, X to draw white</p>
-        <TriangleLegend>
-          <TriangleKey>
-            <TrianglePreview orientation="bottom-right" color="black" />
-            <span>Q</span>
-          </TriangleKey>
-          <TriangleKey>
-            <TrianglePreview orientation="bottom-left" color="black" />
-            <span>W</span>
-          </TriangleKey>
-          <TriangleKey>
-            <TrianglePreview orientation="top-right" color="black" />
-            <span>A</span>
-          </TriangleKey>
-          <TriangleKey>
-            <TrianglePreview orientation="top-left" color="black" />
-            <span>S</span>
-          </TriangleKey>
-        </TriangleLegend>
-        <Button onClick={invertPixels} style={{ marginTop: '20px' }}>Invert Colors</Button>
-      </div>
     </AppContainer>
   );
 };
