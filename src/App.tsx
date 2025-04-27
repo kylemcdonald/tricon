@@ -250,7 +250,7 @@ const App: React.FC = () => {
       ctx.arc(mousePosition.x, mousePosition.y, 2, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [grid, hoverPosition, backgroundImage, pixelSize, mousePosition]);
+  }, [grid, hoverPosition, backgroundImage, pixelSize, mousePosition, canvasSize]);
 
   useEffect(() => {
     drawGrid();
