@@ -116,10 +116,26 @@ class App {
     this.canvasSize = GRID_SIZE * this.pixelSize;
     this.canvasContainer.style.width = `${this.canvasSize}px`;
     this.canvasContainer.style.height = `${this.canvasSize}px`;
-    this.baseCanvas.width = this.canvasSize;
-    this.baseCanvas.height = this.canvasSize;
-    this.overlayCanvas.width = this.canvasSize;
-    this.overlayCanvas.height = this.canvasSize;
+    
+    const dpr = window.devicePixelRatio || 1;
+    this.baseCanvas.width = this.canvasSize * dpr;
+    this.baseCanvas.height = this.canvasSize * dpr;
+    this.overlayCanvas.width = this.canvasSize * dpr;
+    this.overlayCanvas.height = this.canvasSize * dpr;
+    
+    const baseCtx = this.baseCanvas.getContext('2d');
+    const overlayCtx = this.overlayCanvas.getContext('2d');
+    
+    if (baseCtx && overlayCtx) {
+      baseCtx.scale(dpr, dpr);
+      overlayCtx.scale(dpr, dpr);
+    }
+    
+    this.baseCanvas.style.width = `${this.canvasSize}px`;
+    this.baseCanvas.style.height = `${this.canvasSize}px`;
+    this.overlayCanvas.style.width = `${this.canvasSize}px`;
+    this.overlayCanvas.style.height = `${this.canvasSize}px`;
+    
     this.drawBase();
   }
 
@@ -138,42 +154,49 @@ class App {
     }
 
     ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 0.5;
 
     ctx.beginPath();
+    ctx.translate(0.25, 0.25);
+    
     for (let i = 0; i <= GRID_SIZE; i++) {
-      const x = i * this.pixelSize - 0.5;
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.canvasSize);
-
-      ctx.moveTo(0, x);
-      ctx.lineTo(this.canvasSize, x);
+      const x = i * this.pixelSize;
+      const y = (GRID_SIZE - i) * this.pixelSize;
+      
+      if (i > 0 && i < GRID_SIZE) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, this.canvasSize);
+        ctx.moveTo(0, x);
+        ctx.lineTo(this.canvasSize, x);
+      }
       
       ctx.moveTo(x, 0);
-      ctx.lineTo(this.canvasSize, (GRID_SIZE - i) * this.pixelSize);
+      ctx.lineTo(this.canvasSize, y);
+      
       if (i > 0) {
         ctx.moveTo(0, x);
-        ctx.lineTo((GRID_SIZE - i) * this.pixelSize, this.canvasSize);
-      }
-      
-      ctx.moveTo((GRID_SIZE - i) * this.pixelSize, 0);
-      ctx.lineTo(0, (GRID_SIZE - i) * this.pixelSize);
-      if (i > 0) {
-        ctx.moveTo(this.canvasSize, (GRID_SIZE - i) * this.pixelSize);
-        ctx.lineTo((GRID_SIZE - i) * this.pixelSize, this.canvasSize);
+        ctx.lineTo(y, this.canvasSize);
+        ctx.moveTo(y, 0);
+        ctx.lineTo(0, y);
+        ctx.moveTo(this.canvasSize, y);
+        ctx.lineTo(y, this.canvasSize);
       }
     }
+    
     ctx.stroke();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.fillStyle = 'black';
     this.grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
+        if (pixel === 'clear') return;
+
         const x = j * this.pixelSize;
         const y = i * this.pixelSize;
 
         if (pixel === 'black') {
           ctx.fillRect(x, y, this.pixelSize, this.pixelSize);
-        } else if (pixel !== 'clear') {
+        } else {
           ctx.beginPath();
           switch (pixel) {
             case 'top-left':
