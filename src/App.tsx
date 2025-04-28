@@ -1,7 +1,31 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { Grid, Pixel, DrawingState, TriangleOrientation, PixelColor, HoverRegion } from './types';
+import { Grid, PixelState, DrawingState, HoverRegion } from './types';
 import { saveAs } from 'file-saver';
+
+class GridManager {
+  private grid: Grid;
+  private onChange: (grid: Grid) => void;
+
+  constructor(initialGrid: Grid, onChange: (grid: Grid) => void) {
+    this.grid = initialGrid;
+    this.onChange = onChange;
+  }
+
+  updatePixel(row: number, col: number, state: PixelState = 'black') {
+    this.grid[row][col] = state;
+    this.onChange([...this.grid]);
+  }
+
+  getGrid(): Grid {
+    return this.grid;
+  }
+
+  setGrid(newGrid: Grid) {
+    this.grid = newGrid;
+    this.onChange([...this.grid]);
+  }
+}
 
 const GRID_SIZE = 26;
 const EXPORT_PIXEL_SIZE = 12;
@@ -58,7 +82,7 @@ const Button = styled.button`
 
 const createEmptyGrid = (): Grid => {
   return Array(GRID_SIZE).fill(null).map(() =>
-    Array(GRID_SIZE).fill(null).map(() => ({ color: 'clear' }))
+    Array(GRID_SIZE).fill(null).map(() => 'clear')
   );
 };
 
@@ -73,30 +97,61 @@ const generateHash = (content: any): string => {
   return Math.abs(hash).toString(16).slice(0, 8);
 };
 
+const bresenhamLine = (x0: number, y0: number, x1: number, y1: number, callback: (x: number, y: number) => void) => {
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+
+  while (true) {
+    callback(x0, y0);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x0 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y0 += sy;
+    }
+  }
+};
+
 const App: React.FC = () => {
-  const backgroundCanvasRef = useRef<HTMLCanvasElement>(null);
-  const gridCanvasRef = useRef<HTMLCanvasElement>(null);
+  const baseCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [needsGridRedraw, setNeedsGridRedraw] = useState(true);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
+  const gridManagerRef = useRef<GridManager | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [pixelSize, setPixelSize] = useState<number>(32);
   const [drawingState, setDrawingState] = useState<DrawingState>({
     isDrawing: false,
-    triangleMode: null,
-    hoverRegion: null,
+    hoverRegion: null
   });
+  const [drawingMode, setDrawingMode] = useState<PixelState>('black');
   const [lastPosition, setLastPosition] = useState<{ row: number; col: number; region: HoverRegion } | null>(null);
+  const [previousPosition, setPreviousPosition] = useState<{ row: number; col: number; region: HoverRegion } | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ row: number; col: number; region: HoverRegion } | null>(null);
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
-  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  const [keyboardPosition, setKeyboardPosition] = useState<{ row: number; col: number } | null>(null);
+
+  useEffect(() => {
+    gridManagerRef.current = new GridManager(grid, setGrid);
+  }, [grid]);
+
+  useEffect(() => {
+    if (gridManagerRef.current) {
+      gridManagerRef.current.setGrid(grid);
+    }
+  }, [grid]);
 
   useEffect(() => {
     const updatePixelSize = () => {
       const windowHeight = window.innerHeight;
       const newPixelSize = Math.floor((windowHeight - 100) / GRID_SIZE);
       setPixelSize(newPixelSize);
-      setNeedsGridRedraw(true);
     };
 
     updatePixelSize();
@@ -106,8 +161,8 @@ const App: React.FC = () => {
 
   const canvasSize = GRID_SIZE * pixelSize;
 
-  const drawBackground = useCallback(() => {
-    const canvas = backgroundCanvasRef.current;
+  const drawBase = useCallback(() => {
+    const canvas = baseCanvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
@@ -138,99 +193,80 @@ const App: React.FC = () => {
     ctx.lineWidth = 1;
 
     // Draw vertical lines
+    ctx.beginPath();
     for (let i = 0; i <= GRID_SIZE; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * pixelSize - 0.5, 0);
-      ctx.lineTo(i * pixelSize - 0.5, canvasSize);
-      ctx.stroke();
+      const x = i * pixelSize - 0.5;
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvasSize);
     }
+    ctx.stroke();
 
     // Draw horizontal lines
+    ctx.beginPath();
     for (let i = 0; i <= GRID_SIZE; i++) {
-      ctx.beginPath();
-      ctx.moveTo(0, i * pixelSize - 0.5);
-      ctx.lineTo(canvasSize, i * pixelSize - 0.5);
-      ctx.stroke();
+      const y = i * pixelSize - 0.5;
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvasSize, y);
     }
+    ctx.stroke();
 
     // Draw diagonal X-shaped grid within each cell
     ctx.strokeStyle = '#e0e0e0';
     ctx.lineWidth = 0.5;
 
     // Draw diagonal from top-left to bottom-right
+    ctx.beginPath();
     for (let i = 0; i < GRID_SIZE; i++) {
       const x = i * pixelSize;
       const y = 0;
-      ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
-      ctx.stroke();
     }
+    ctx.stroke();
 
     // Draw diagonal from top-right to bottom-left
+    ctx.beginPath();
     for (let i = 0; i < GRID_SIZE; i++) {
       const x = i * pixelSize;
       const y = 0;
-      ctx.beginPath();
       ctx.moveTo(x + pixelSize, y);
       ctx.lineTo(x - pixelSize * (GRID_SIZE - 1), y + pixelSize * GRID_SIZE);
-      ctx.stroke();
     }
+    ctx.stroke();
 
     // Draw diagonal from top-left to bottom-right (vertical)
+    ctx.beginPath();
     for (let i = 0; i < GRID_SIZE; i++) {
       const x = 0;
       const y = i * pixelSize;
-      ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
-      ctx.stroke();
     }
+    ctx.stroke();
 
     // Draw diagonal from top-right to bottom-left (vertical)
+    ctx.beginPath();
     for (let i = 0; i < GRID_SIZE; i++) {
       const x = pixelSize * GRID_SIZE;
       const y = i * pixelSize;
-      ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x - pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
-      ctx.stroke();
     }
-  }, [backgroundImage, pixelSize, canvasSize]);
+    ctx.stroke();
 
-  const drawGrid = useCallback(() => {
-    if (!needsGridRedraw) return;
+    // Draw grid content
+    ctx.fillStyle = 'black';
     
-    const canvas = gridCanvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvasSize, canvasSize);
-
-    // Draw only black pixels and triangles
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
         const x = j * pixelSize;
         const y = i * pixelSize;
 
-        if (pixel.color === 'black') {
-          ctx.fillStyle = 'black';
+        if (pixel === 'black') {
           ctx.fillRect(x, y, pixelSize, pixelSize);
-        }
-
-        if (pixel.triangle) {
-          ctx.fillStyle = 'black';
+        } else if (pixel !== 'clear') {
           ctx.beginPath();
-          switch (pixel.triangle.orientation) {
+          switch (pixel) {
             case 'top-left':
               ctx.moveTo(x, y);
               ctx.lineTo(x, y + pixelSize);
@@ -257,9 +293,7 @@ const App: React.FC = () => {
         }
       });
     });
-    
-    setNeedsGridRedraw(false);
-  }, [grid, pixelSize, canvasSize, needsGridRedraw]);
+  }, [grid, backgroundImage, pixelSize, canvasSize]);
 
   const drawOverlay = useCallback(() => {
     const canvas = overlayCanvasRef.current;
@@ -274,7 +308,7 @@ const App: React.FC = () => {
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
-    // Clear canvas
+    // Clear overlay canvas
     ctx.clearRect(0, 0, canvasSize, canvasSize);
 
     // Draw hover overlay
@@ -283,11 +317,14 @@ const App: React.FC = () => {
       const y = hoverPosition.row * pixelSize;
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
 
-      if (hoverPosition.region === 'center') {
+      // If we're in drawing mode or a key is pressed, use the drawing mode's region
+      const region = drawingState.isDrawing ? drawingMode : hoverPosition.region;
+
+      if (region === 'black' || region === 'center' || region === 'clear') {
         ctx.fillRect(x, y, pixelSize, pixelSize);
       } else {
         ctx.beginPath();
-        switch (hoverPosition.region) {
+        switch (region) {
           case 'top-left':
             ctx.moveTo(x, y);
             ctx.lineTo(x, y + pixelSize);
@@ -321,12 +358,14 @@ const App: React.FC = () => {
       ctx.arc(mousePosition.x, mousePosition.y, 2, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [hoverPosition, mousePosition, pixelSize, canvasSize]);
+  }, [hoverPosition, mousePosition, pixelSize, canvasSize, drawingState.isDrawing, drawingMode]);
+
+  useEffect(() => {
+    drawBase();
+  }, [drawBase]);
 
   useEffect(() => {
     const animate = () => {
-      drawBackground();
-      drawGrid();
       drawOverlay();
       requestAnimationFrame(animate);
     };
@@ -336,10 +375,10 @@ const App: React.FC = () => {
     return () => {
       cancelAnimationFrame(frameId);
     };
-  }, [drawBackground, drawGrid, drawOverlay]);
+  }, [drawOverlay]);
 
   const getMousePosition = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = overlayCanvasRef.current;
+    const canvas = baseCanvasRef.current;
     if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
@@ -380,17 +419,20 @@ const App: React.FC = () => {
 
     setDrawingState(prev => ({ ...prev, isDrawing: true, hoverRegion: pos.region }));
     setLastPosition(pos);
+    setPreviousPosition(pos);
     setHoverPosition(pos);
 
+    let state: PixelState;
     if (pos.region === 'center') {
-      updatePixel(pos.row, pos.col, 'black');
+      state = 'black';
     } else {
-      updatePixel(pos.row, pos.col, 'clear', pos.region);
+      state = pos.region;
     }
+    updatePixel(pos.row, pos.col, state);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = overlayCanvasRef.current;
+    const canvas = baseCanvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -399,42 +441,40 @@ const App: React.FC = () => {
     setMousePosition({ x, y });
 
     const pos = getMousePosition(e);
-
-    // Update hover position based on pressed keys
-    if (pos) {
-      if (drawingState.isDrawing && lastPosition) {
-        setHoverPosition({ ...pos, region: lastPosition.region });
-      } else {
-        let region: HoverRegion = pos.region;
-        if (pressedKeys.has('z') || pressedKeys.has('x')) {
-          region = 'center';
-        } else if (pressedKeys.has('q')) {
-          region = 'bottom-right';
-        } else if (pressedKeys.has('w')) {
-          region = 'bottom-left';
-        } else if (pressedKeys.has('a')) {
-          region = 'top-right';
-        } else if (pressedKeys.has('s')) {
-          region = 'top-left';
-        }
-        setHoverPosition({ ...pos, region });
-      }
-    }
-
     if (!pos) return;
 
-    if (drawingState.isDrawing && lastPosition) {
-      if (lastPosition.region === 'center') {
-        updatePixel(pos.row, pos.col, 'black');
+    if (drawingState.isDrawing && previousPosition) {
+      setHoverPosition({ ...pos, region: lastPosition?.region || pos.region });
+      
+      let state: PixelState;
+      if (lastPosition?.region === 'center') {
+        state = 'black';
       } else {
-        updatePixel(pos.row, pos.col, 'clear', lastPosition.region);
+        state = (lastPosition?.region || pos.region) as PixelState;
       }
+
+      // Use Bresenham's line algorithm to draw between consecutive points
+      bresenhamLine(
+        previousPosition.col,
+        previousPosition.row,
+        pos.col,
+        pos.row,
+        (x, y) => {
+          if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+            updatePixel(y, x, state);
+          }
+        }
+      );
+      setPreviousPosition(pos);
+    } else {
+      setHoverPosition(pos);
     }
   };
 
   const handleMouseUp = () => {
     setDrawingState(prev => ({ ...prev, isDrawing: false }));
     setLastPosition(null);
+    setPreviousPosition(null);
   };
 
   const handleMouseLeave = () => {
@@ -442,83 +482,9 @@ const App: React.FC = () => {
     setMousePosition(null);
   };
 
-  const updatePixel = useCallback((row: number, col: number, color: PixelColor = 'black', triangleMode: TriangleOrientation | null = null) => {
-    setGrid(prev => {
-      const newGrid = [...prev];
-      const newRow = [...newGrid[row]];
-      const newPixel: Pixel = {
-        color: 'clear',
-        ...(triangleMode && {
-          triangle: {
-            orientation: triangleMode
-          }
-        }),
-        ...(color === 'black' && !triangleMode && {
-          color: 'black'
-        })
-      };
-      newRow[col] = newPixel;
-      newGrid[row] = newRow;
-      setNeedsGridRedraw(true);
-      return newGrid;
-    });
+  const updatePixel = useCallback((row: number, col: number, state: PixelState = 'black') => {
+    gridManagerRef.current?.updatePixel(row, col, state);
   }, []);
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (['z', 'x', 's', 'a', 'w', 'q'].includes(e.key)) {
-      setPressedKeys(prev => new Set(prev).add(e.key));
-      if (hoverPosition) {
-        let region: HoverRegion;
-        if (e.key === 'z' || e.key === 'x') {
-          region = 'center';
-        } else if (e.key === 'q') {
-          region = 'bottom-right';
-        } else if (e.key === 'w') {
-          region = 'bottom-left';
-        } else if (e.key === 'a') {
-          region = 'top-right';
-        } else if (e.key === 's') {
-          region = 'top-left';
-        } else {
-          region = hoverPosition.region;
-        }
-        setHoverPosition({ ...hoverPosition, region });
-
-        if (e.key === 'z') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'black');
-        } else if (e.key === 'x') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'clear');
-        } else if (e.key === 's') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'top-left');
-        } else if (e.key === 'a') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'top-right');
-        } else if (e.key === 'w') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'bottom-left');
-        } else if (e.key === 'q') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'bottom-right');
-        }
-      }
-    }
-  }, [hoverPosition, updatePixel]);
-
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
-    if (['z', 'x', 's', 'a', 'w', 'q'].includes(e.key)) {
-      setPressedKeys(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(e.key);
-        return newSet;
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [handleKeyDown, handleKeyUp]);
 
   useEffect(() => {
     const handleGlobalMouseUp = () => {
@@ -527,11 +493,78 @@ const App: React.FC = () => {
       }
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!hoverPosition) return;
+      
+      const key = e.key.toLowerCase();
+      let mode: PixelState | null = null;
+      
+      switch (key) {
+        case 'z':
+          mode = 'black';
+          break;
+        case 'x':
+          mode = 'clear';
+          break;
+        case 'q':
+          mode = 'bottom-right';
+          break;
+        case 'w':
+          mode = 'bottom-left';
+          break;
+        case 'a':
+          mode = 'top-right';
+          break;
+        case 's':
+          mode = 'top-left';
+          break;
+      }
+
+      if (mode !== null) {
+        setDrawingState(prev => ({ ...prev, isDrawing: true }));
+        setDrawingMode(mode);
+        setKeyboardPosition({ row: hoverPosition.row, col: hoverPosition.col });
+        updatePixel(hoverPosition.row, hoverPosition.col, mode);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (['z', 'x', 'q', 'w', 'a', 's'].includes(key)) {
+        setDrawingState(prev => ({ ...prev, isDrawing: false }));
+        setKeyboardPosition(null);
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (drawingState.isDrawing && keyboardPosition && hoverPosition) {
+        bresenhamLine(
+          keyboardPosition.col,
+          keyboardPosition.row,
+          hoverPosition.col,
+          hoverPosition.row,
+          (x, y) => {
+            if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+              updatePixel(y, x, drawingMode);
+            }
+          }
+        );
+        setKeyboardPosition({ row: hoverPosition.row, col: hoverPosition.col });
+      }
+    };
+
     window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [drawingState.isDrawing]);
+  }, [drawingState.isDrawing, hoverPosition, keyboardPosition, updatePixel, drawingMode]);
 
   const exportAsPNG = useCallback(() => {
     const hash = generateHash(grid);
@@ -546,21 +579,19 @@ const App: React.FC = () => {
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, exportSize, exportSize);
 
-    // Draw black elements
+    // Draw elements
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
         const x = j * 32;
         const y = i * 32;
 
-        if (pixel.color === 'black') {
+        if (pixel === 'black') {
           ctx.fillStyle = 'black';
           ctx.fillRect(x, y, 32, 32);
-        }
-
-        if (pixel.triangle) {
+        } else if (pixel !== 'clear') {
           ctx.fillStyle = 'black';
           ctx.beginPath();
-          switch (pixel.triangle.orientation) {
+          switch (pixel) {
             case 'top-left':
               ctx.moveTo(x, y);
               ctx.lineTo(x, y + 32);
@@ -605,7 +636,7 @@ const App: React.FC = () => {
 
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
-        if (pixel.color === 'black') {
+        if (pixel === 'black') {
           const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           rect.setAttribute('x', `${j * EXPORT_PIXEL_SIZE}`);
           rect.setAttribute('y', `${i * EXPORT_PIXEL_SIZE}`);
@@ -613,9 +644,7 @@ const App: React.FC = () => {
           rect.setAttribute('height', `${EXPORT_PIXEL_SIZE}`);
           rect.setAttribute('fill', 'black');
           svg.appendChild(rect);
-        }
-
-        if (pixel.triangle) {
+        } else if (pixel !== 'clear') {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           const points = {
             'top-left': `M${j * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} Z`,
@@ -623,7 +652,7 @@ const App: React.FC = () => {
             'bottom-left': `M${j * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} Z`,
             'bottom-right': `M${(j + 1) * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} Z`,
           };
-          path.setAttribute('d', points[pixel.triangle.orientation]);
+          path.setAttribute('d', points[pixel]);
           path.setAttribute('fill', 'black');
           svg.appendChild(path);
         }
@@ -681,30 +710,29 @@ const App: React.FC = () => {
   };
 
   const invertPixels = () => {
-    setGrid(prev => prev.map(row =>
-      row.map(pixel => {
-        if (pixel.color === 'clear' && !pixel.triangle) {
-          return { color: 'black' };
-        } else if (pixel.color === 'black') {
-          return { color: 'clear' };
-        } else if (pixel.triangle) {
-          const invertedOrientation = {
-            'top-left': 'bottom-right',
-            'top-right': 'bottom-left',
-            'bottom-left': 'top-right',
-            'bottom-right': 'top-left'
-          }[pixel.triangle.orientation] as TriangleOrientation;
-          return {
-            color: 'clear',
-            triangle: {
-              orientation: invertedOrientation
-            }
-          };
-        } else {
-          return pixel;
-        }
-      })
-    ));
+    setGrid(prev => {
+      const newGrid = prev.map(row =>
+        row.map(pixel => {
+          if (pixel === 'clear') {
+            return 'black';
+          } else if (pixel === 'black') {
+            return 'clear';
+          } else {
+            const inverted = {
+              'top-left': 'bottom-right',
+              'top-right': 'bottom-left',
+              'bottom-left': 'top-right',
+              'bottom-right': 'top-left'
+            }[pixel];
+            return inverted as PixelState;
+          }
+        })
+      );
+      if (gridManagerRef.current) {
+        gridManagerRef.current.setGrid(newGrid);
+      }
+      return newGrid;
+    });
   };
 
   return (
@@ -719,14 +747,13 @@ const App: React.FC = () => {
       </Controls>
       <CanvasContainer width={canvasSize} height={canvasSize}>
         <Canvas
-          ref={backgroundCanvasRef}
+          ref={baseCanvasRef}
           width={canvasSize}
           height={canvasSize}
-        />
-        <Canvas
-          ref={gridCanvasRef}
-          width={canvasSize}
-          height={canvasSize}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
         />
         <Canvas
           ref={overlayCanvasRef}
