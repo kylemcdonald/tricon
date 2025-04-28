@@ -156,13 +156,13 @@ class App {
     ctx.strokeStyle = '#cccccc';
     ctx.lineWidth = 0.5;
 
-    ctx.beginPath();
     ctx.translate(0.25, 0.25);
-    
+    ctx.beginPath();
     for (let i = 0; i <= GRID_SIZE; i++) {
       const x = i * this.pixelSize;
       const y = (GRID_SIZE - i) * this.pixelSize;
       
+      // Draw vertical and horizontal grid lines
       if (i > 0 && i < GRID_SIZE) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x, this.canvasSize);
@@ -170,21 +170,21 @@ class App {
         ctx.lineTo(this.canvasSize, x);
       }
       
+      // Draw diagonal lines
       ctx.moveTo(x, 0);
       ctx.lineTo(this.canvasSize, y);
+      ctx.moveTo(y, 0);
+      ctx.lineTo(0, y);
       
       if (i > 0) {
         ctx.moveTo(0, x);
         ctx.lineTo(y, this.canvasSize);
-        ctx.moveTo(y, 0);
-        ctx.lineTo(0, y);
         ctx.moveTo(this.canvasSize, y);
         ctx.lineTo(y, this.canvasSize);
       }
     }
-    
     ctx.stroke();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.translate(-0.25, -0.25);
 
     ctx.fillStyle = 'black';
     this.grid.forEach((row, i) => {
