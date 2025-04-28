@@ -38,9 +38,13 @@
 
         .canvas-container {
             position: relative;
-            border: 1px solid #ccc;
+            border: 1px solid #ddd;
             background: white;
             margin: 0 auto;
+            width: fit-content;
+            height: fit-content;
+            transform: scale(1);
+            transform-origin: 0 0;
         }
 
         canvas {
@@ -49,8 +53,11 @@
             left: 0;
             display: block;
             cursor: none;
-            width: 100%;
-            height: 100%;
+            width: auto;
+            height: auto;
+            image-rendering: pixelated;
+            transform: scale(1);
+            transform-origin: 0 0;
         }
 
         button {
@@ -58,7 +65,7 @@
             cursor: pointer;
         }
     </style>
-  <script type="module" crossorigin src="/grid-drawing-tool/assets/index-bIFeooXK.js"></script>
+  <script type="module" crossorigin src="/grid-drawing-tool/assets/index-D9F8R8dA.js"></script>
 </head>
 <body>
     <div id="app">
