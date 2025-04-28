@@ -94,6 +94,8 @@ class App {
   private hoverPosition: { row: number; col: number; region: HoverRegion } | null = null;
   private mousePosition: { x: number; y: number } | null = null;
   private keyboardPosition: { row: number; col: number } | null = null;
+  private history: PixelState[][][] = [];
+  private historyIndex = -1;
 
   constructor() {
     this.baseCanvas = document.getElementById('base-canvas') as HTMLCanvasElement;
@@ -108,6 +110,7 @@ class App {
     this.initializeEventListeners();
     this.updatePixelSize();
     window.addEventListener('resize', () => this.updatePixelSize());
+    this.saveToHistory();
   }
 
   private updatePixelSize() {
@@ -312,6 +315,42 @@ class App {
     return { row, col, region };
   }
 
+  private saveToHistory() {
+    // Check if the current grid is different from the last saved state
+    const currentState = JSON.stringify(this.grid);
+    const lastState = this.historyIndex >= 0 ? JSON.stringify(this.history[this.historyIndex]) : null;
+    
+    if (currentState !== lastState) {
+      // Remove any redo history
+      this.history = this.history.slice(0, this.historyIndex + 1);
+      // Add current state to history
+      this.history.push(this.grid.map(row => [...row]));
+      this.historyIndex++;
+
+      // Limit history to 100 states
+      if (this.history.length > 100) {
+        this.history = this.history.slice(-100);
+        this.historyIndex = this.history.length - 1;
+      }
+    }
+  }
+
+  private undo() {
+    if (this.historyIndex > 0) {
+      this.historyIndex--;
+      this.grid = this.history[this.historyIndex].map(row => [...row]);
+      this.gridManager.setGrid(this.grid);
+    }
+  }
+
+  private redo() {
+    if (this.historyIndex < this.history.length - 1) {
+      this.historyIndex++;
+      this.grid = this.history[this.historyIndex].map(row => [...row]);
+      this.gridManager.setGrid(this.grid);
+    }
+  }
+
   private handleMouseDown = (e: MouseEvent) => {
     const pos = this.getMousePosition(e);
     if (!pos) return;
@@ -323,7 +362,11 @@ class App {
     this.hoverPosition = pos;
 
     const state = pos.region === 'center' ? 'black' : pos.region;
-    this.gridManager.updatePixel(pos.row, pos.col, state);
+    const currentState = this.grid[pos.row][pos.col];
+    if (currentState !== state) {
+      this.gridManager.updatePixel(pos.row, pos.col, state);
+      this.saveToHistory();
+    }
   };
 
   private handleMouseMove = (e: MouseEvent) => {
@@ -340,6 +383,7 @@ class App {
       
       const state = this.drawingState.hoverRegion === 'center' ? 'black' : (this.drawingState.hoverRegion || pos.region) as PixelState;
 
+      let hasChanges = false;
       bresenhamLine(
         this.previousPosition.col,
         this.previousPosition.row,
@@ -347,10 +391,17 @@ class App {
         pos.row,
         (x, y) => {
           if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-            this.gridManager.updatePixel(y, x, state);
+            const currentState = this.grid[y][x];
+            if (currentState !== state) {
+              this.gridManager.updatePixel(y, x, state);
+              hasChanges = true;
+            }
           }
         }
       );
+      if (hasChanges) {
+        this.saveToHistory();
+      }
       this.previousPosition = pos;
     } else {
       this.hoverPosition = pos;
@@ -359,6 +410,14 @@ class App {
   };
 
   private handleMouseUp = () => {
+    if (this.drawingState.isDrawing) {
+      // Check if there were any changes during the drawing operation
+      const currentState = JSON.stringify(this.grid);
+      const lastState = this.historyIndex >= 0 ? JSON.stringify(this.history[this.historyIndex]) : null;
+      if (currentState !== lastState) {
+        this.saveToHistory();
+      }
+    }
     this.drawingState.isDrawing = false;
     this.lastPosition = null;
     this.previousPosition = null;
@@ -538,7 +597,14 @@ class App {
         }
       })
     );
-    this.gridManager.setGrid(newGrid);
+
+    // Check if the inverted grid is different from the current grid
+    const currentState = JSON.stringify(this.grid);
+    const invertedState = JSON.stringify(newGrid);
+    if (currentState !== invertedState) {
+      this.gridManager.setGrid(newGrid);
+      this.saveToHistory();
+    }
   };
 
   private initializeEventListeners() {
@@ -555,9 +621,25 @@ class App {
       const key = e.key.toLowerCase();
       let mode: PixelState | null = null;
       
+      // Check for undo/redo shortcuts
+      if (key === 'z' && (e.ctrlKey || e.metaKey)) {
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+        return;
+      }
+      
       switch (key) {
         case 'z':
           mode = 'black';
+          break;
+        case 'y':
+          if (e.ctrlKey || e.metaKey) {
+            this.redo();
+            return;
+          }
           break;
         case 'x':
           mode = 'clear';
@@ -584,14 +666,26 @@ class App {
       }
 
       if (mode !== null && this.hoverPosition) {
-        this.keyboardPosition = { row: this.hoverPosition.row, col: this.hoverPosition.col };
-        this.gridManager.updatePixel(this.hoverPosition.row, this.hoverPosition.col, mode);
+        const currentState = this.grid[this.hoverPosition.row][this.hoverPosition.col];
+        if (currentState !== mode) {
+          this.keyboardPosition = { row: this.hoverPosition.row, col: this.hoverPosition.col };
+          this.gridManager.updatePixel(this.hoverPosition.row, this.hoverPosition.col, mode);
+          this.saveToHistory();
+        }
       }
     });
 
     document.addEventListener('keyup', (e) => {
       const key = e.key.toLowerCase();
       if (['z', 'x', 'q', 'w', 'a', 's'].includes(key)) {
+        if (this.drawingState.isDrawing) {
+          // Check if there were any changes during the keyboard drawing operation
+          const currentState = JSON.stringify(this.grid);
+          const lastState = this.historyIndex >= 0 ? JSON.stringify(this.history[this.historyIndex]) : null;
+          if (currentState !== lastState) {
+            this.saveToHistory();
+          }
+        }
         this.drawingState.isDrawing = false;
         this.keyboardPosition = null;
       }
@@ -599,6 +693,7 @@ class App {
 
     document.addEventListener('mousemove', (e) => {
       if (this.drawingState.isDrawing && this.keyboardPosition && this.hoverPosition) {
+        let hasChanges = false;
         bresenhamLine(
           this.keyboardPosition.col,
           this.keyboardPosition.row,
@@ -606,10 +701,17 @@ class App {
           this.hoverPosition.row,
           (x, y) => {
             if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-              this.gridManager.updatePixel(y, x, this.drawingMode);
+              const currentState = this.grid[y][x];
+              if (currentState !== this.drawingMode) {
+                this.gridManager.updatePixel(y, x, this.drawingMode);
+                hasChanges = true;
+              }
             }
           }
         );
+        if (hasChanges) {
+          this.saveToHistory();
+        }
         this.keyboardPosition = { row: this.hoverPosition.row, col: this.hoverPosition.col };
       }
     });
