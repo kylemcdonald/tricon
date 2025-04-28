@@ -666,7 +666,11 @@ const App: React.FC = () => {
 
   const exportAsJSON = useCallback(() => {
     const hash = generateHash(grid);
-    const blob = new Blob([JSON.stringify(grid)], { type: 'application/json' });
+    const exportData = {
+      version: 1,
+      grid: grid
+    };
+    const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
     saveAs(blob, `${hash}.json`);
   }, [grid]);
 
@@ -684,7 +688,8 @@ const App: React.FC = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
           try {
-            const loadedGrid = JSON.parse(event.target?.result as string);
+            const loadedData = JSON.parse(event.target?.result as string);
+            const loadedGrid = loadedData.version === 1 ? loadedData.grid : loadedData;
             setGrid(loadedGrid);
           } catch (error) {
             console.error('Error loading file:', error);
