@@ -13,17 +13,19 @@ class GridManager {
   }
 
   updatePixel(row: number, col: number, state: PixelState = 'black') {
-    this.grid[row][col] = state;
-    this.onChange([...this.grid]);
+    const newGrid = this.grid.map(row => [...row]);
+    newGrid[row][col] = state;
+    this.grid = newGrid;
+    this.onChange(newGrid);
   }
 
   getGrid(): Grid {
-    return this.grid;
+    return this.grid.map(row => [...row]);
   }
 
   setGrid(newGrid: Grid) {
-    this.grid = newGrid;
-    this.onChange([...this.grid]);
+    this.grid = newGrid.map(row => [...row]);
+    this.onChange(this.grid);
   }
 }
 
@@ -124,6 +126,8 @@ const App: React.FC = () => {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
   const gridManagerRef = useRef<GridManager | null>(null);
+  const setGridRef = useRef(setGrid);
+  setGridRef.current = setGrid;
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [pixelSize, setPixelSize] = useState<number>(32);
   const [drawingState, setDrawingState] = useState<DrawingState>({
@@ -138,12 +142,15 @@ const App: React.FC = () => {
   const [keyboardPosition, setKeyboardPosition] = useState<{ row: number; col: number } | null>(null);
 
   useEffect(() => {
-    gridManagerRef.current = new GridManager(grid, setGrid);
-  }, [grid]);
+    gridManagerRef.current = new GridManager(grid, (newGrid) => setGridRef.current(newGrid));
+  }, []);
 
   useEffect(() => {
     if (gridManagerRef.current) {
-      gridManagerRef.current.setGrid(grid);
+      const currentGrid = gridManagerRef.current.getGrid();
+      if (JSON.stringify(currentGrid) !== JSON.stringify(grid)) {
+        gridManagerRef.current.setGrid(grid);
+      }
     }
   }, [grid]);
 
@@ -715,29 +722,26 @@ const App: React.FC = () => {
   };
 
   const invertPixels = () => {
-    setGrid(prev => {
-      const newGrid = prev.map(row =>
-        row.map(pixel => {
-          if (pixel === 'clear') {
-            return 'black';
-          } else if (pixel === 'black') {
-            return 'clear';
-          } else {
-            const inverted = {
-              'top-left': 'bottom-right',
-              'top-right': 'bottom-left',
-              'bottom-left': 'top-right',
-              'bottom-right': 'top-left'
-            }[pixel];
-            return inverted as PixelState;
-          }
-        })
-      );
-      if (gridManagerRef.current) {
-        gridManagerRef.current.setGrid(newGrid);
-      }
-      return newGrid;
-    });
+    const newGrid = grid.map(row =>
+      row.map(pixel => {
+        if (pixel === 'clear') {
+          return 'black';
+        } else if (pixel === 'black') {
+          return 'clear';
+        } else {
+          const inverted = {
+            'top-left': 'bottom-right',
+            'top-right': 'bottom-left',
+            'bottom-left': 'top-right',
+            'bottom-right': 'top-left'
+          }[pixel];
+          return inverted as PixelState;
+        }
+      })
+    );
+    if (gridManagerRef.current) {
+      gridManagerRef.current.setGrid(newGrid);
+    }
   };
 
   return (
