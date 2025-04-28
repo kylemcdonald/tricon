@@ -6,9 +6,8 @@ A React-based drawing tool that allows users to create pixel art and geometric p
 
 - 26x26 grid with adjustable pixel size
 - Two drawing modes:
-  - Square pixels
-  - Triangular subdivisions (top-left, top-right, bottom-left, bottom-right)
-- Color toggling between black and white
+  - Square pixels (black or clear)
+  - Triangular subdivisions (black triangles in one of four corners)
 - Export capabilities:
   - PNG export
   - SVG export
@@ -19,11 +18,11 @@ A React-based drawing tool that allows users to create pixel art and geometric p
 ## Keyboard Controls
 
 - `Z`: Draw black pixel
-- `X`: Draw white pixel
-- `Q`: Top-left triangle mode
-- `W`: Top-right triangle mode
-- `A`: Bottom-left triangle mode
-- `S`: Bottom-right triangle mode
+- `X`: Clear pixel (erase)
+- `Q`: Draw black triangle in bottom-right corner
+- `W`: Draw black triangle in bottom-left corner
+- `A`: Draw black triangle in top-right corner
+- `S`: Draw black triangle in top-left corner
 
 ## Installation
 
@@ -75,8 +74,8 @@ serve -s build
 The grid drawing tool is built using React and styled-components. The main components are:
 
 1. **Grid Container**: A styled div that creates the grid layout using CSS Grid
-2. **Pixel Elements**: Individual cells that can be either square pixels or contain triangular subdivisions
-3. **Drawing State**: Manages the current drawing mode, color, and triangle orientation
+2. **Pixel Elements**: Individual cells that can be either black squares, clear squares, or contain black triangles in one of four corners
+3. **Drawing State**: Manages the current drawing mode and triangle orientation
 4. **Export Functions**: Convert the grid state to various formats (PNG, SVG, JSON)
 
 The tool uses Bresenham's line algorithm for smooth line drawing when dragging the mouse across multiple pixels. The drawing state is managed using React's useState hook, and the grid is represented as a 2D array of pixel objects.

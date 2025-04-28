@@ -47,8 +47,8 @@ const Button = styled.button`
 `;
 
 const createEmptyGrid = (): Grid => {
-  return Array(GRID_SIZE).fill(null).map(() => 
-    Array(GRID_SIZE).fill(null).map(() => ({ color: 'white' }))
+  return Array(GRID_SIZE).fill(null).map(() =>
+    Array(GRID_SIZE).fill(null).map(() => ({ color: 'clear' }))
   );
 };
 
@@ -122,7 +122,7 @@ const App: React.FC = () => {
     // Draw grid lines first
     ctx.strokeStyle = '#cccccc';
     ctx.lineWidth = 1;
-    
+
     // Draw vertical lines
     for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath();
@@ -130,7 +130,7 @@ const App: React.FC = () => {
       ctx.lineTo(i * pixelSize - 0.5, canvasSize);
       ctx.stroke();
     }
-    
+
     // Draw horizontal lines
     for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath();
@@ -143,23 +143,44 @@ const App: React.FC = () => {
     ctx.strokeStyle = '#e0e0e0';
     ctx.lineWidth = 0.5;
 
+    // Draw diagonal from top-left to bottom-right
     for (let i = 0; i < GRID_SIZE; i++) {
-      for (let j = 0; j < GRID_SIZE; j++) {
-        const x = j * pixelSize;
-        const y = i * pixelSize;
+      const x = i * pixelSize;
+      const y = 0;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
+      ctx.stroke();
+    }
 
-        // Draw diagonal from top-left to bottom-right
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + pixelSize, y + pixelSize);
-        ctx.stroke();
+    // Draw diagonal from top-right to bottom-left
+    for (let i = 0; i < GRID_SIZE; i++) {
+      const x = i * pixelSize;
+      const y = 0;
+      ctx.beginPath();
+      ctx.moveTo(x + pixelSize, y);
+      ctx.lineTo(x - pixelSize * (GRID_SIZE - 1), y + pixelSize * GRID_SIZE);
+      ctx.stroke();
+    }
 
-        // Draw diagonal from top-right to bottom-left
-        ctx.beginPath();
-        ctx.moveTo(x + pixelSize, y);
-        ctx.lineTo(x, y + pixelSize);
-        ctx.stroke();
-      }
+    // Draw diagonal from top-left to bottom-right (vertical)
+    for (let i = 0; i < GRID_SIZE; i++) {
+      const x = 0;
+      const y = i * pixelSize;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
+      ctx.stroke();
+    }
+
+    // Draw diagonal from top-right to bottom-left (vertical)
+    for (let i = 0; i < GRID_SIZE; i++) {
+      const x = pixelSize * GRID_SIZE;
+      const y = i * pixelSize;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
+      ctx.stroke();
     }
 
     // Draw only black pixels on top
@@ -176,7 +197,7 @@ const App: React.FC = () => {
 
         // Draw triangle if present
         if (pixel.triangle) {
-          ctx.fillStyle = pixel.triangle.color;
+          ctx.fillStyle = 'black';
           ctx.beginPath();
           switch (pixel.triangle.orientation) {
             case 'top-left':
@@ -211,7 +232,7 @@ const App: React.FC = () => {
       const x = hoverPosition.col * pixelSize;
       const y = hoverPosition.row * pixelSize;
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-      
+
       if (hoverPosition.region === 'center') {
         ctx.fillRect(x, y, pixelSize, pixelSize);
       } else {
@@ -263,7 +284,7 @@ const App: React.FC = () => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const col = Math.floor(x / pixelSize);
     const row = Math.floor(y / pixelSize);
 
@@ -292,28 +313,6 @@ const App: React.FC = () => {
     return { row, col, region };
   };
 
-  const drawLine = (x0: number, y0: number, x1: number, y1: number) => {
-    const dx = Math.abs(x1 - x0);
-    const dy = Math.abs(y1 - y0);
-    const sx = x0 < x1 ? 1 : -1;
-    const sy = y0 < y1 ? 1 : -1;
-    let err = dx - dy;
-
-    while (true) {
-      updatePixel(y0, x0);
-      if (x0 === x1 && y0 === y1) break;
-      const e2 = 2 * err;
-      if (e2 > -dy) {
-        err -= dy;
-        x0 += sx;
-      }
-      if (e2 < dx) {
-        err += dx;
-        y0 += sy;
-      }
-    }
-  };
-
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const pos = getMousePosition(e);
     if (!pos) return;
@@ -321,11 +320,11 @@ const App: React.FC = () => {
     setDrawingState(prev => ({ ...prev, isDrawing: true, hoverRegion: pos.region }));
     setLastPosition(pos);
     setHoverPosition(pos);
-    
+
     if (pos.region === 'center') {
       updatePixel(pos.row, pos.col, 'black');
     } else {
-      updatePixel(pos.row, pos.col, 'white', pos.region);
+      updatePixel(pos.row, pos.col, 'clear', pos.region);
     }
   };
 
@@ -339,7 +338,7 @@ const App: React.FC = () => {
     setMousePosition({ x, y });
 
     const pos = getMousePosition(e);
-    
+
     // Update hover position based on pressed keys
     if (pos) {
       if (drawingState.isDrawing && lastPosition) {
@@ -360,7 +359,7 @@ const App: React.FC = () => {
         setHoverPosition({ ...pos, region });
       }
     }
-    
+
     drawGrid();
 
     if (!pos) return;
@@ -369,7 +368,7 @@ const App: React.FC = () => {
       if (lastPosition.region === 'center') {
         updatePixel(pos.row, pos.col, 'black');
       } else {
-        updatePixel(pos.row, pos.col, 'white', lastPosition.region);
+        updatePixel(pos.row, pos.col, 'clear', lastPosition.region);
       }
     }
   };
@@ -389,13 +388,15 @@ const App: React.FC = () => {
       const newGrid = [...prev];
       const newRow = [...newGrid[row]];
       const newPixel: Pixel = {
-        color: triangleMode ? 'white' : color,
+        color: 'clear',
         ...(triangleMode && {
           triangle: {
-            orientation: triangleMode,
-            color: 'black',
-          },
+            orientation: triangleMode
+          }
         }),
+        ...(color === 'black' && !triangleMode && {
+          color: 'black'
+        })
       };
       newRow[col] = newPixel;
       newGrid[row] = newRow;
@@ -426,15 +427,15 @@ const App: React.FC = () => {
         if (e.key === 'z') {
           updatePixel(hoverPosition.row, hoverPosition.col, 'black');
         } else if (e.key === 'x') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'white');
+          updatePixel(hoverPosition.row, hoverPosition.col, 'clear');
         } else if (e.key === 's') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'top-left');
+          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'top-left');
         } else if (e.key === 'a') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'top-right');
+          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'top-right');
         } else if (e.key === 'w') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'bottom-left');
+          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'bottom-left');
         } else if (e.key === 'q') {
-          updatePixel(hoverPosition.row, hoverPosition.col, 'white', 'bottom-right');
+          updatePixel(hoverPosition.row, hoverPosition.col, 'clear', 'bottom-right');
         }
       }
     }
@@ -496,7 +497,7 @@ const App: React.FC = () => {
           ctx.fillRect(x, y, 32, 32);
         }
 
-        if (pixel.triangle && pixel.triangle.color === 'black') {
+        if (pixel.triangle) {
           ctx.fillStyle = 'black';
           ctx.beginPath();
           switch (pixel.triangle.orientation) {
@@ -550,11 +551,11 @@ const App: React.FC = () => {
           rect.setAttribute('y', `${i * EXPORT_PIXEL_SIZE}`);
           rect.setAttribute('width', `${EXPORT_PIXEL_SIZE}`);
           rect.setAttribute('height', `${EXPORT_PIXEL_SIZE}`);
-          rect.setAttribute('fill', pixel.color);
+          rect.setAttribute('fill', 'black');
           svg.appendChild(rect);
         }
 
-        if (pixel.triangle && pixel.triangle.color === 'black') {
+        if (pixel.triangle) {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           const points = {
             'top-left': `M${j * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} Z`,
@@ -563,7 +564,7 @@ const App: React.FC = () => {
             'bottom-right': `M${(j + 1) * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${j * EXPORT_PIXEL_SIZE},${(i + 1) * EXPORT_PIXEL_SIZE} L${(j + 1) * EXPORT_PIXEL_SIZE},${i * EXPORT_PIXEL_SIZE} Z`,
           };
           path.setAttribute('d', points[pixel.triangle.orientation]);
-          path.setAttribute('fill', pixel.triangle.color);
+          path.setAttribute('fill', 'black');
           svg.appendChild(path);
         }
       });
@@ -620,17 +621,29 @@ const App: React.FC = () => {
   };
 
   const invertPixels = () => {
-    setGrid(prev => prev.map(row => 
-      row.map(pixel => ({
-        ...pixel,
-        color: pixel.color === 'black' ? 'white' : 'black',
-        ...(pixel.triangle && {
-          triangle: {
-            ...pixel.triangle,
-            color: pixel.triangle.color === 'black' ? 'white' : 'black'
-          }
-        })
-      }))
+    setGrid(prev => prev.map(row =>
+      row.map(pixel => {
+        if (pixel.color === 'clear' && !pixel.triangle) {
+          return { color: 'black' };
+        } else if (pixel.color === 'black') {
+          return { color: 'clear' };
+        } else if (pixel.triangle) {
+          const invertedOrientation = {
+            'top-left': 'bottom-right',
+            'top-right': 'bottom-left',
+            'bottom-left': 'top-right',
+            'bottom-right': 'top-left'
+          }[pixel.triangle.orientation] as TriangleOrientation;
+          return {
+            color: 'clear',
+            triangle: {
+              orientation: invertedOrientation
+            }
+          };
+        } else {
+          return pixel;
+        }
+      })
     ));
   };
 

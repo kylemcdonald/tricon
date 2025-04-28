@@ -1,4 +1,4 @@
-export type PixelColor = 'black' | 'white';
+export type PixelColor = 'black' | 'clear';
 
 export type TriangleOrientation = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
@@ -8,7 +8,6 @@ export interface Pixel {
   color: PixelColor;
   triangle?: {
     orientation: TriangleOrientation;
-    color: PixelColor;
   };
 }
 
