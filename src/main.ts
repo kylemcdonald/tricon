@@ -145,14 +145,23 @@ class App {
       const x = i * this.pixelSize - 0.5;
       ctx.moveTo(x, 0);
       ctx.lineTo(x, this.canvasSize);
-    }
-    ctx.stroke();
 
-    ctx.beginPath();
-    for (let i = 0; i <= GRID_SIZE; i++) {
-      const y = i * this.pixelSize - 0.5;
-      ctx.moveTo(0, y);
-      ctx.lineTo(this.canvasSize, y);
+      ctx.moveTo(0, x);
+      ctx.lineTo(this.canvasSize, x);
+      
+      ctx.moveTo(x, 0);
+      ctx.lineTo(this.canvasSize, (GRID_SIZE - i) * this.pixelSize);
+      if (i > 0) {
+        ctx.moveTo(0, x);
+        ctx.lineTo((GRID_SIZE - i) * this.pixelSize, this.canvasSize);
+      }
+      
+      ctx.moveTo((GRID_SIZE - i) * this.pixelSize, 0);
+      ctx.lineTo(0, (GRID_SIZE - i) * this.pixelSize);
+      if (i > 0) {
+        ctx.moveTo(this.canvasSize, (GRID_SIZE - i) * this.pixelSize);
+        ctx.lineTo((GRID_SIZE - i) * this.pixelSize, this.canvasSize);
+      }
     }
     ctx.stroke();
 

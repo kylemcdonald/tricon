@@ -14,6 +14,10 @@ A React-based drawing tool that allows users to create pixel art and geometric p
   - JSON export (for saving and loading drawings)
 - Drag and drop support for loading saved drawings
 - Keyboard shortcuts for quick access to features
+- Real-time preview
+- Pixel size adjustment
+- Background color customization
+- Invert colors functionality
 
 ## Keyboard Controls
 
@@ -28,7 +32,7 @@ A React-based drawing tool that allows users to create pixel art and geometric p
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/grid-drawing-tool.git
+git clone https://github.com/kylemcdonald/grid-drawing-tool.git
 cd grid-drawing-tool
 ```
 
@@ -41,10 +45,10 @@ npm install
 
 To start the development server:
 ```bash
-npm start
+npm run dev
 ```
 
-This will run the app in development mode. Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+This will run the app in development mode. Open [http://localhost:5173](http://localhost:5173) to view it in your browser.
 
 ## Building for Production
 
@@ -53,28 +57,24 @@ To create a production build:
 npm run build
 ```
 
-The build artifacts will be stored in the `build/` directory.
+The build artifacts will be stored in the `dist/` directory.
 
-## Serving the Production Build
+## Deployment
 
-You can serve the production build using any static file server. For example, using `serve`:
+The project is configured for GitHub Pages deployment. To deploy:
 
-1. Install serve globally:
 ```bash
-npm install -g serve
+npm run deploy
 ```
 
-2. Serve the build directory:
-```bash
-serve -s build
-```
+This will build the project and deploy it to GitHub Pages.
 
 ## How It Works
 
-The grid drawing tool is built using React and styled-components. The main components are:
+The grid drawing tool is built using React, TypeScript, and Vite. The main components are:
 
-1. **Grid Container**: A styled div that creates the grid layout using CSS Grid
-2. **Pixel Elements**: Individual cells that can be either black squares, clear squares, or contain black triangles in one of four corners
+1. **Grid Manager**: A class that handles grid state and updates
+2. **Canvas**: A canvas element that renders the grid and handles drawing interactions
 3. **Drawing State**: Manages the current drawing mode and triangle orientation
 4. **Export Functions**: Convert the grid state to various formats (PNG, SVG, JSON)
 
