@@ -607,6 +607,37 @@ class App {
     }
   };
 
+  private shiftGrid(direction: 'up' | 'down' | 'left' | 'right') {
+    const newGrid = createEmptyGrid();
+    
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        let sourceRow = i;
+        let sourceCol = j;
+        
+        switch (direction) {
+          case 'up':
+            sourceRow = (i + 1) % GRID_SIZE;
+            break;
+          case 'down':
+            sourceRow = (i - 1 + GRID_SIZE) % GRID_SIZE;
+            break;
+          case 'left':
+            sourceCol = (j + 1) % GRID_SIZE;
+            break;
+          case 'right':
+            sourceCol = (j - 1 + GRID_SIZE) % GRID_SIZE;
+            break;
+        }
+        
+        newGrid[i][j] = this.grid[sourceRow][sourceCol];
+      }
+    }
+    
+    this.gridManager.setGrid(newGrid);
+    this.saveToHistory();
+  }
+
   private initializeEventListeners() {
     this.baseCanvas.addEventListener('mousedown', this.handleMouseDown);
     this.baseCanvas.addEventListener('mousemove', this.handleMouseMove);
@@ -630,8 +661,21 @@ class App {
         }
         return;
       }
-      
+
+      // Handle arrow key shifts
       switch (key) {
+        case 'arrowup':
+          this.shiftGrid('up');
+          return;
+        case 'arrowdown':
+          this.shiftGrid('down');
+          return;
+        case 'arrowleft':
+          this.shiftGrid('left');
+          return;
+        case 'arrowright':
+          this.shiftGrid('right');
+          return;
         case 'z':
           mode = 'black';
           break;
