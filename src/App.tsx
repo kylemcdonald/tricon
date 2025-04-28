@@ -27,18 +27,28 @@ const Controls = styled.div`
   top: 20px;
 `;
 
-const CanvasContainer = styled.div`
+interface CanvasContainerProps {
+  width: number;
+  height: number;
+}
+
+const CanvasContainer = styled.div<CanvasContainerProps>`
   position: relative;
   border: 1px solid #ccc;
   background: white;
   margin: 0 auto;
+  width: ${props => props.width}px;
+  height: ${props => props.height}px;
 `;
 
 const Canvas = styled.canvas`
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
   cursor: none;
-  width: ${props => props.width}px;
-  height: ${props => props.height}px;
+  width: 100%;
+  height: 100%;
 `;
 
 const Button = styled.button`
@@ -64,7 +74,10 @@ const generateHash = (content: any): string => {
 };
 
 const App: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const backgroundCanvasRef = useRef<HTMLCanvasElement>(null);
+  const gridCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [needsGridRedraw, setNeedsGridRedraw] = useState(true);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid());
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [pixelSize, setPixelSize] = useState<number>(32);
@@ -92,8 +105,8 @@ const App: React.FC = () => {
 
   const canvasSize = GRID_SIZE * pixelSize;
 
-  const drawGrid = useCallback(() => {
-    const canvas = canvasRef.current;
+  const drawBackground = useCallback(() => {
+    const canvas = backgroundCanvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
@@ -119,7 +132,7 @@ const App: React.FC = () => {
       ctx.globalAlpha = 1;
     }
 
-    // Draw grid lines first
+    // Draw grid lines
     ctx.strokeStyle = '#cccccc';
     ctx.lineWidth = 1;
 
@@ -182,20 +195,37 @@ const App: React.FC = () => {
       ctx.lineTo(x - pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
       ctx.stroke();
     }
+  }, [backgroundImage, pixelSize, canvasSize]);
 
-    // Draw only black pixels on top
+  const drawGrid = useCallback(() => {
+    if (!needsGridRedraw) return;
+    
+    const canvas = gridCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+    // Draw only black pixels and triangles
     grid.forEach((row, i) => {
       row.forEach((pixel, j) => {
         const x = j * pixelSize;
         const y = i * pixelSize;
 
-        // Only draw if the pixel is black
         if (pixel.color === 'black') {
           ctx.fillStyle = 'black';
           ctx.fillRect(x, y, pixelSize, pixelSize);
         }
 
-        // Draw triangle if present
         if (pixel.triangle) {
           ctx.fillStyle = 'black';
           ctx.beginPath();
@@ -226,8 +256,27 @@ const App: React.FC = () => {
         }
       });
     });
+    
+    setNeedsGridRedraw(false);
+  }, [grid, pixelSize, canvasSize, needsGridRedraw]);
 
-    // Draw hover overlay last
+  const drawOverlay = useCallback(() => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+    // Draw hover overlay
     if (hoverPosition) {
       const x = hoverPosition.col * pixelSize;
       const y = hoverPosition.row * pixelSize;
@@ -266,19 +315,30 @@ const App: React.FC = () => {
 
     // Draw cursor dot
     if (mousePosition) {
-      ctx.fillStyle = 'black';
+      ctx.fillStyle = 'red';
       ctx.beginPath();
       ctx.arc(mousePosition.x, mousePosition.y, 2, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [grid, hoverPosition, backgroundImage, pixelSize, mousePosition, canvasSize]);
+  }, [hoverPosition, mousePosition, pixelSize, canvasSize]);
 
   useEffect(() => {
-    drawGrid();
-  }, [drawGrid]);
+    const animate = () => {
+      drawBackground();
+      drawGrid();
+      drawOverlay();
+      requestAnimationFrame(animate);
+    };
+    
+    const frameId = requestAnimationFrame(animate);
+    
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [drawBackground, drawGrid, drawOverlay]);
 
   const getMousePosition = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
+    const canvas = overlayCanvasRef.current;
     if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
@@ -329,7 +389,7 @@ const App: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
+    const canvas = overlayCanvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -359,8 +419,6 @@ const App: React.FC = () => {
         setHoverPosition({ ...pos, region });
       }
     }
-
-    drawGrid();
 
     if (!pos) return;
 
@@ -400,6 +458,7 @@ const App: React.FC = () => {
       };
       newRow[col] = newPixel;
       newGrid[row] = newRow;
+      setNeedsGridRedraw(true);
       return newGrid;
     });
   }, []);
@@ -657,9 +716,19 @@ const App: React.FC = () => {
         {backgroundImage && <Button onClick={clearBackground}>Clear Background</Button>}
         <Button onClick={invertPixels}>Invert Colors</Button>
       </Controls>
-      <CanvasContainer>
+      <CanvasContainer width={canvasSize} height={canvasSize}>
         <Canvas
-          ref={canvasRef}
+          ref={backgroundCanvasRef}
+          width={canvasSize}
+          height={canvasSize}
+        />
+        <Canvas
+          ref={gridCanvasRef}
+          width={canvasSize}
+          height={canvasSize}
+        />
+        <Canvas
+          ref={overlayCanvasRef}
           width={canvasSize}
           height={canvasSize}
           onMouseDown={handleMouseDown}
