@@ -238,7 +238,9 @@ class App {
       const y = this.hoverPosition.row * this.pixelSize;
       ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
 
-      const region = this.drawingState.isDrawing ? this.drawingMode : this.hoverPosition.region;
+      const region = this.drawingState.isDrawing ? 
+        (this.drawingState.hoverRegion || this.hoverPosition.region) : 
+        this.hoverPosition.region;
 
       if (region === 'black' || region === 'center' || region === 'clear') {
         ctx.fillRect(x, y, this.pixelSize, this.pixelSize);
@@ -334,9 +336,9 @@ class App {
     if (!pos) return;
 
     if (this.drawingState.isDrawing && this.previousPosition) {
-      this.hoverPosition = { ...pos, region: this.lastPosition?.region || pos.region };
+      this.hoverPosition = { ...pos, region: this.drawingState.hoverRegion || pos.region };
       
-      const state = this.lastPosition?.region === 'center' ? 'black' : (this.lastPosition?.region || pos.region) as PixelState;
+      const state = this.drawingState.hoverRegion === 'center' ? 'black' : (this.drawingState.hoverRegion || pos.region) as PixelState;
 
       bresenhamLine(
         this.previousPosition.col,
@@ -550,8 +552,6 @@ class App {
     this.overlayCanvas.addEventListener('mouseleave', this.handleMouseLeave);
 
     document.addEventListener('keydown', (e) => {
-      if (!this.hoverPosition) return;
-      
       const key = e.key.toLowerCase();
       let mode: PixelState | null = null;
       
@@ -579,6 +579,11 @@ class App {
       if (mode !== null) {
         this.drawingState.isDrawing = true;
         this.drawingMode = mode;
+        this.drawingState.hoverRegion = mode;
+        this.drawOverlay();
+      }
+
+      if (mode !== null && this.hoverPosition) {
         this.keyboardPosition = { row: this.hoverPosition.row, col: this.hoverPosition.col };
         this.gridManager.updatePixel(this.hoverPosition.row, this.hoverPosition.col, mode);
       }
