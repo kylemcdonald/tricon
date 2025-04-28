@@ -142,7 +142,9 @@ const App: React.FC = () => {
   const [keyboardPosition, setKeyboardPosition] = useState<{ row: number; col: number } | null>(null);
 
   useEffect(() => {
-    gridManagerRef.current = new GridManager(grid, (newGrid) => setGridRef.current(newGrid));
+    gridManagerRef.current = new GridManager(grid, (newGrid) => {
+      setGridRef.current(newGrid);
+    });
   }, []);
 
   useEffect(() => {
@@ -217,54 +219,11 @@ const App: React.FC = () => {
     }
     ctx.stroke();
 
-    // Draw diagonal X-shaped grid within each cell
-    ctx.strokeStyle = '#e0e0e0';
-    ctx.lineWidth = 0.5;
-
-    // Draw diagonal from top-left to bottom-right
-    ctx.beginPath();
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const x = i * pixelSize;
-      const y = 0;
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
-    }
-    ctx.stroke();
-
-    // Draw diagonal from top-right to bottom-left
-    ctx.beginPath();
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const x = i * pixelSize;
-      const y = 0;
-      ctx.moveTo(x + pixelSize, y);
-      ctx.lineTo(x - pixelSize * (GRID_SIZE - 1), y + pixelSize * GRID_SIZE);
-    }
-    ctx.stroke();
-
-    // Draw diagonal from top-left to bottom-right (vertical)
-    ctx.beginPath();
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const x = 0;
-      const y = i * pixelSize;
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
-    }
-    ctx.stroke();
-
-    // Draw diagonal from top-right to bottom-left (vertical)
-    ctx.beginPath();
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const x = pixelSize * GRID_SIZE;
-      const y = i * pixelSize;
-      ctx.moveTo(x, y);
-      ctx.lineTo(x - pixelSize * GRID_SIZE, y + pixelSize * GRID_SIZE);
-    }
-    ctx.stroke();
-
     // Draw grid content
     ctx.fillStyle = 'black';
     
-    grid.forEach((row, i) => {
+    const currentGrid = gridManagerRef.current?.getGrid() || grid;
+    currentGrid.forEach((row, i) => {
       row.forEach((pixel, j) => {
         const x = j * pixelSize;
         const y = i * pixelSize;
@@ -369,7 +328,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     drawBase();
-  }, [drawBase]);
+  }, [drawBase, grid]);
 
   useEffect(() => {
     const animate = () => {
@@ -490,7 +449,9 @@ const App: React.FC = () => {
   };
 
   const updatePixel = useCallback((row: number, col: number, state: PixelState = 'black') => {
-    gridManagerRef.current?.updatePixel(row, col, state);
+    if (gridManagerRef.current) {
+      gridManagerRef.current.updatePixel(row, col, state);
+    }
   }, []);
 
   useEffect(() => {
@@ -531,7 +492,9 @@ const App: React.FC = () => {
         setDrawingState(prev => ({ ...prev, isDrawing: true }));
         setDrawingMode(mode);
         setKeyboardPosition({ row: hoverPosition.row, col: hoverPosition.col });
-        updatePixel(hoverPosition.row, hoverPosition.col, mode);
+        if (gridManagerRef.current) {
+          gridManagerRef.current.updatePixel(hoverPosition.row, hoverPosition.col, mode);
+        }
       }
     };
 
@@ -552,7 +515,9 @@ const App: React.FC = () => {
           hoverPosition.row,
           (x, y) => {
             if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-              updatePixel(y, x, drawingMode);
+              if (gridManagerRef.current) {
+                gridManagerRef.current.updatePixel(y, x, drawingMode);
+              }
             }
           }
         );
@@ -571,7 +536,7 @@ const App: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [drawingState.isDrawing, hoverPosition, keyboardPosition, updatePixel, drawingMode]);
+  }, [drawingState.isDrawing, hoverPosition, keyboardPosition, drawingMode]);
 
   const exportAsPNG = useCallback(() => {
     const hash = generateHash(grid);
