@@ -1,1 +1,79 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/grid-drawing-tool/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta name="description" content="A powerful grid drawing tool for creating and editing grid-based designs"/><link rel="apple-touch-icon" href="/grid-drawing-tool/logo192.png"/><link rel="manifest" href="/grid-drawing-tool/manifest.json"/><title>Grid Drawing Tool</title><script defer="defer" src="/grid-drawing-tool/static/js/main.07aefb3e.js"></script><link href="/grid-drawing-tool/static/css/main.6d5f48cd.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Drawing Tool</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 0 20px;
+            user-select: none;
+            gap: 20px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 150px;
+            position: fixed;
+            left: 20px;
+            top: 20px;
+        }
+
+        .canvas-container {
+            position: relative;
+            border: 1px solid #ccc;
+            background: white;
+            margin: 0 auto;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
+            cursor: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+    </style>
+  <script type="module" crossorigin src="/grid-drawing-tool/assets/index-Bb4uh-oX.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div class="controls">
+            <button id="export-png">Export PNG</button>
+            <button id="export-svg">Export SVG</button>
+            <button id="export-json">Export JSON</button>
+            <button id="export-all">Export All</button>
+            <button id="clear-background" style="display: none;">Clear Background</button>
+            <button id="invert-colors">Invert Colors</button>
+        </div>
+        <div class="canvas-container">
+            <canvas id="base-canvas"></canvas>
+            <canvas id="overlay-canvas"></canvas>
+        </div>
+    </div>
+</body>
+</html> 
