@@ -96,6 +96,7 @@ const App: React.FC = () => {
       const windowHeight = window.innerHeight;
       const newPixelSize = Math.floor((windowHeight - 100) / GRID_SIZE);
       setPixelSize(newPixelSize);
+      setNeedsGridRedraw(true);
     };
 
     updatePixelSize();
