@@ -1,4 +1,5 @@
 # Tricon
+## by Knee Alley
 
 A React-based drawing tool that allows users to create pixel art and geometric patterns on a grid. The tool supports both square pixels and triangular subdivisions, making it perfect for creating pixel art, isometric designs, and geometric patterns.
 
