@@ -2,7 +2,7 @@
   "name": "grid-drawing-tool",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://kylemcdonald.github.io/grid-drawing-tool",
+  "homepage": "https://tricon.engineering",
   "type": "module",
   "scripts": {
     "dev": "vite",

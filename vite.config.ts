@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/grid-drawing-tool/',
+  base: '/',
   build: {
     outDir: 'dist',
     sourcemap: false
