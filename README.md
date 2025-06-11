@@ -11,8 +11,10 @@ A React-based drawing tool that allows users to create pixel art and geometric p
 - Export capabilities:
   - PNG export
   - SVG export
-  - JSON export (for saving and loading drawings)
-- Drag and drop support for loading saved drawings
+  - JSON export
+- Import capabilities:
+  - JSON import
+  - PNG import (overlay only)
 - Keyboard shortcuts for quick access to features
 - Real-time preview
 - Pixel size adjustment
@@ -32,8 +34,8 @@ A React-based drawing tool that allows users to create pixel art and geometric p
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/kylemcdonald/grid-drawing-tool.git
-cd grid-drawing-tool
+git clone https://github.com/kylemcdonald/tricon.git
+cd tricon
 ```
 
 2. Install dependencies:
