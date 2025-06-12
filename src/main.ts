@@ -527,9 +527,23 @@ class App {
 
   private exportAsJSON = () => {
     const hash = generateHash(this.grid);
+    const data = this.grid.map(row => 
+      row.map(pixel => {
+        switch (pixel) {
+          case 'top-left': return 'a';
+          case 'top-right': return 'b';
+          case 'bottom-left': return 'c';
+          case 'bottom-right': return 'd';
+          case 'black': return 'x';
+          case 'clear': return 'o';
+        }
+      }).join('')
+    ).join('');
+    
     const exportData = {
-      version: 1,
-      grid: this.grid
+      version: 2,
+      shape: [GRID_SIZE, GRID_SIZE],
+      data
     };
     const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
     saveAs(blob, `${hash}.json`);
@@ -550,7 +564,32 @@ class App {
         reader.onload = (event) => {
           try {
             const loadedData = JSON.parse(event.target?.result as string);
-            const loadedGrid = loadedData.version === 1 ? loadedData.grid : loadedData;
+            let loadedGrid: PixelState[][];
+            
+            if (loadedData.version === 1) {
+              loadedGrid = loadedData.grid;
+            } else if (loadedData.version === 2) {
+              const [rows, cols] = loadedData.shape;
+              loadedGrid = Array(rows).fill(null).map(() => Array(cols).fill('clear'));
+              
+              let index = 0;
+              for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                  const char = loadedData.data[index++];
+                  switch (char) {
+                    case 'a': loadedGrid[i][j] = 'top-left'; break;
+                    case 'b': loadedGrid[i][j] = 'top-right'; break;
+                    case 'c': loadedGrid[i][j] = 'bottom-left'; break;
+                    case 'd': loadedGrid[i][j] = 'bottom-right'; break;
+                    case 'x': loadedGrid[i][j] = 'black'; break;
+                    case 'o': loadedGrid[i][j] = 'clear'; break;
+                  }
+                }
+              }
+            } else {
+              throw new Error('Unsupported file version');
+            }
+            
             this.gridManager.setGrid(loadedGrid);
           } catch (error) {
             console.error('Error loading file:', error);
