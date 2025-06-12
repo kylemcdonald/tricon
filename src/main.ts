@@ -7,8 +7,8 @@ type DrawingState = {
   hoverRegion: HoverRegion | null;
 };
 
-const GRID_SIZE = 26;
 const EXPORT_PIXEL_SIZE = 12;
+const DEFAULT_GRID_SIZE = 26;
 
 class GridManager {
   private grid: PixelState[][];
@@ -36,9 +36,9 @@ class GridManager {
   }
 }
 
-const createEmptyGrid = (): PixelState[][] => {
-  return Array(GRID_SIZE).fill(null).map(() =>
-    Array(GRID_SIZE).fill(null).map(() => 'clear')
+const createEmptyGrid = (size: number): PixelState[][] => {
+  return Array(size).fill(null).map(() =>
+    Array(size).fill(null).map(() => 'clear')
   );
 };
 
@@ -76,6 +76,7 @@ const bresenhamLine = (x0: number, y0: number, x1: number, y1: number, callback:
 };
 
 class App {
+  private gridSize: number;
   private baseCanvas: HTMLCanvasElement;
   private overlayCanvas: HTMLCanvasElement;
   private canvasContainer: HTMLElement;
@@ -83,7 +84,7 @@ class App {
   private gridManager: GridManager;
   private backgroundImage: HTMLImageElement | null = null;
   private pixelSize = 32;
-  private canvasSize = GRID_SIZE * this.pixelSize;
+  private canvasSize: number;
   private drawingState: DrawingState = {
     isDrawing: false,
     hoverRegion: null
@@ -98,25 +99,27 @@ class App {
   private historyIndex = -1;
 
   constructor() {
+    this.gridSize = DEFAULT_GRID_SIZE;
     this.baseCanvas = document.getElementById('base-canvas') as HTMLCanvasElement;
     this.overlayCanvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
     this.canvasContainer = document.querySelector('.canvas-container') as HTMLElement;
-    this.grid = createEmptyGrid();
+    this.grid = createEmptyGrid(this.gridSize);
     this.gridManager = new GridManager(this.grid, (newGrid) => {
       this.grid = newGrid;
       this.drawBase();
     });
-
+    this.canvasSize = this.gridSize * this.pixelSize;
     this.initializeEventListeners();
     this.updatePixelSize();
     window.addEventListener('resize', () => this.updatePixelSize());
     this.saveToHistory();
+    this.updateGridSizeDisplay();
   }
 
   private updatePixelSize() {
     const windowHeight = window.innerHeight;
-    this.pixelSize = Math.floor((windowHeight - 100) / GRID_SIZE);
-    this.canvasSize = GRID_SIZE * this.pixelSize;
+    this.pixelSize = Math.floor((windowHeight - 100) / this.gridSize);
+    this.canvasSize = this.gridSize * this.pixelSize;
     this.canvasContainer.style.width = `${this.canvasSize}px`;
     this.canvasContainer.style.height = `${this.canvasSize}px`;
     
@@ -161,12 +164,12 @@ class App {
 
     ctx.translate(0.25, 0.25);
     ctx.beginPath();
-    for (let i = 0; i <= GRID_SIZE; i++) {
+    for (let i = 0; i <= this.gridSize; i++) {
       const x = i * this.pixelSize;
-      const y = (GRID_SIZE - i) * this.pixelSize;
+      const y = (this.gridSize - i) * this.pixelSize;
       
       // Draw vertical and horizontal grid lines
-      if (i > 0 && i < GRID_SIZE) {
+      if (i > 0 && i < this.gridSize) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x, this.canvasSize);
         ctx.moveTo(0, x);
@@ -292,7 +295,7 @@ class App {
     const col = Math.floor(x / this.pixelSize);
     const row = Math.floor(y / this.pixelSize);
 
-    if (col < 0 || col >= GRID_SIZE || row < 0 || row >= GRID_SIZE) {
+    if (col < 0 || col >= this.gridSize || row < 0 || row >= this.gridSize) {
       return null;
     }
 
@@ -390,7 +393,7 @@ class App {
         pos.col,
         pos.row,
         (x, y) => {
-          if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+          if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
             const currentState = this.grid[y][x];
             if (currentState !== state) {
               this.gridManager.updatePixel(y, x, state);
@@ -432,7 +435,7 @@ class App {
   private exportAsPNG = () => {
     const hash = generateHash(this.grid);
     const exportCanvas = document.createElement('canvas');
-    const exportSize = GRID_SIZE * 32;
+    const exportSize = this.gridSize * 32;
     exportCanvas.width = exportSize;
     exportCanvas.height = exportSize;
     const ctx = exportCanvas.getContext('2d');
@@ -490,7 +493,7 @@ class App {
   private exportAsSVG = () => {
     const hash = generateHash(this.grid);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    const exportSize = GRID_SIZE * EXPORT_PIXEL_SIZE;
+    const exportSize = this.gridSize * EXPORT_PIXEL_SIZE;
     svg.setAttribute('width', `${exportSize}`);
     svg.setAttribute('height', `${exportSize}`);
     svg.setAttribute('viewBox', `0 0 ${exportSize} ${exportSize}`);
@@ -542,7 +545,6 @@ class App {
     
     const exportData = {
       version: 2,
-      shape: [GRID_SIZE, GRID_SIZE],
       data
     };
     const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
@@ -565,16 +567,21 @@ class App {
           try {
             const loadedData = JSON.parse(event.target?.result as string);
             let loadedGrid: PixelState[][];
-            
+            let newSize: number | null = null;
             if (loadedData.version === 1) {
               loadedGrid = loadedData.grid;
+              newSize = loadedGrid.length;
             } else if (loadedData.version === 2) {
-              const [rows, cols] = loadedData.shape;
-              loadedGrid = Array(rows).fill(null).map(() => Array(cols).fill('clear'));
-              
+              const dataLength = loadedData.data.length;
+              const size = Math.sqrt(dataLength);
+              if (!Number.isInteger(size)) {
+                throw new Error('Data length is not a perfect square for version 2 JSON');
+              }
+              newSize = size;
+              loadedGrid = Array(size).fill(null).map(() => Array(size).fill('clear'));
               let index = 0;
-              for (let i = 0; i < rows; i++) {
-                for (let j = 0; j < cols; j++) {
+              for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
                   const char = loadedData.data[index++];
                   switch (char) {
                     case 'a': loadedGrid[i][j] = 'top-left'; break;
@@ -589,7 +596,11 @@ class App {
             } else {
               throw new Error('Unsupported file version');
             }
-            
+            if (newSize && newSize > 0) {
+              this.gridSize = newSize;
+              this.updatePixelSize();
+              this.updateGridSizeDisplay();
+            }
             this.gridManager.setGrid(loadedGrid);
           } catch (error) {
             console.error('Error loading file:', error);
@@ -647,25 +658,25 @@ class App {
   };
 
   private shiftGrid(direction: 'up' | 'down' | 'left' | 'right') {
-    const newGrid = createEmptyGrid();
+    const newGrid = createEmptyGrid(this.gridSize);
     
-    for (let i = 0; i < GRID_SIZE; i++) {
-      for (let j = 0; j < GRID_SIZE; j++) {
+    for (let i = 0; i < this.gridSize; i++) {
+      for (let j = 0; j < this.gridSize; j++) {
         let sourceRow = i;
         let sourceCol = j;
         
         switch (direction) {
           case 'up':
-            sourceRow = (i + 1) % GRID_SIZE;
+            sourceRow = (i + 1) % this.gridSize;
             break;
           case 'down':
-            sourceRow = (i - 1 + GRID_SIZE) % GRID_SIZE;
+            sourceRow = (i - 1 + this.gridSize) % this.gridSize;
             break;
           case 'left':
-            sourceCol = (j + 1) % GRID_SIZE;
+            sourceCol = (j + 1) % this.gridSize;
             break;
           case 'right':
-            sourceCol = (j - 1 + GRID_SIZE) % GRID_SIZE;
+            sourceCol = (j - 1 + this.gridSize) % this.gridSize;
             break;
         }
         
@@ -676,6 +687,31 @@ class App {
     this.gridManager.setGrid(newGrid);
     this.saveToHistory();
   }
+
+  private resizeGrid(newSize: number) {
+    if (newSize < 1) return;
+    const oldGrid = this.grid;
+    const size = newSize;
+    const newGrid = createEmptyGrid(size);
+    for (let i = 0; i < Math.min(size, oldGrid.length); i++) {
+      for (let j = 0; j < Math.min(size, oldGrid[i].length); j++) {
+        newGrid[i][j] = oldGrid[i][j];
+      }
+    }
+    this.gridSize = size;
+    this.gridManager.setGrid(newGrid);
+    this.updatePixelSize();
+    this.saveToHistory();
+    this.updateGridSizeDisplay();
+  }
+
+  private makeGridBigger = () => {
+    this.resizeGrid(this.gridSize + 1);
+  };
+
+  private makeGridSmaller = () => {
+    this.resizeGrid(this.gridSize - 1);
+  };
 
   private initializeEventListeners() {
     this.baseCanvas.addEventListener('mousedown', this.handleMouseDown);
@@ -739,6 +775,9 @@ class App {
         case 's':
           mode = 'top-left';
           break;
+        case 'i':
+          this.invertPixels();
+          return;
       }
 
       if (mode !== null) {
@@ -783,7 +822,7 @@ class App {
           this.hoverPosition.col,
           this.hoverPosition.row,
           (x, y) => {
-            if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+            if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
               const currentState = this.grid[y][x];
               if (currentState !== this.drawingMode) {
                 this.gridManager.updatePixel(y, x, this.drawingMode);
@@ -804,10 +843,18 @@ class App {
     document.getElementById('export-json')?.addEventListener('click', this.exportAsJSON);
     document.getElementById('export-all')?.addEventListener('click', this.exportAll);
     document.getElementById('clear-background')?.addEventListener('click', this.clearBackground);
-    document.getElementById('invert-colors')?.addEventListener('click', this.invertPixels);
+    document.getElementById('bigger-grid')?.addEventListener('click', this.makeGridBigger);
+    document.getElementById('smaller-grid')?.addEventListener('click', this.makeGridSmaller);
 
     document.addEventListener('dragover', (e) => e.preventDefault());
     document.addEventListener('drop', this.handleFileDrop);
+  }
+
+  private updateGridSizeDisplay() {
+    const el = document.getElementById('grid-size-display');
+    if (el) {
+      el.textContent = this.gridSize.toString();
+    }
   }
 }
 
