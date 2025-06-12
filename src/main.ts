@@ -533,12 +533,12 @@ class App {
     const data = this.grid.map(row => 
       row.map(pixel => {
         switch (pixel) {
-          case 'top-left': return 'a';
-          case 'top-right': return 'b';
-          case 'bottom-left': return 'c';
-          case 'bottom-right': return 'd';
-          case 'black': return 'x';
-          case 'clear': return 'o';
+          case 'top-left': return 's';
+          case 'top-right': return 'a';
+          case 'bottom-left': return 'w';
+          case 'bottom-right': return 'q';
+          case 'black': return 'z';
+          case 'clear': return 'x';
         }
       }).join('')
     ).join('');
@@ -584,12 +584,12 @@ class App {
                 for (let j = 0; j < size; j++) {
                   const char = loadedData.data[index++];
                   switch (char) {
-                    case 'a': loadedGrid[i][j] = 'top-left'; break;
-                    case 'b': loadedGrid[i][j] = 'top-right'; break;
-                    case 'c': loadedGrid[i][j] = 'bottom-left'; break;
-                    case 'd': loadedGrid[i][j] = 'bottom-right'; break;
-                    case 'x': loadedGrid[i][j] = 'black'; break;
-                    case 'o': loadedGrid[i][j] = 'clear'; break;
+                    case 's': loadedGrid[i][j] = 'top-left'; break;
+                    case 'a': loadedGrid[i][j] = 'top-right'; break;
+                    case 'w': loadedGrid[i][j] = 'bottom-left'; break;
+                    case 'q': loadedGrid[i][j] = 'bottom-right'; break;
+                    case 'z': loadedGrid[i][j] = 'black'; break;
+                    case 'x': loadedGrid[i][j] = 'clear'; break;
                   }
                 }
               }
