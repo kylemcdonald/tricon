@@ -103,10 +103,27 @@ class App {
     this.baseCanvas = document.getElementById('base-canvas') as HTMLCanvasElement;
     this.overlayCanvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
     this.canvasContainer = document.querySelector('.canvas-container') as HTMLElement;
-    this.grid = createEmptyGrid(this.gridSize);
+    
+    // Load saved state from localStorage
+    const savedState = localStorage.getItem('triconState');
+    if (savedState) {
+      try {
+        const { grid, gridSize } = JSON.parse(savedState);
+        this.gridSize = gridSize;
+        this.grid = grid;
+      } catch (e) {
+        console.error('Error loading saved state:', e);
+        this.grid = createEmptyGrid(this.gridSize);
+      }
+    } else {
+      this.grid = createEmptyGrid(this.gridSize);
+    }
+    
     this.gridManager = new GridManager(this.grid, (newGrid) => {
       this.grid = newGrid;
       this.drawBase();
+      // Save state whenever grid changes
+      this.saveState();
     });
     this.canvasSize = this.gridSize * this.pixelSize;
     this.initializeEventListeners();
@@ -114,6 +131,14 @@ class App {
     window.addEventListener('resize', () => this.updatePixelSize());
     this.saveToHistory();
     this.updateGridSizeDisplay();
+  }
+
+  private saveState() {
+    const state = {
+      grid: this.grid,
+      gridSize: this.gridSize
+    };
+    localStorage.setItem('triconState', JSON.stringify(state));
   }
 
   private updatePixelSize() {
@@ -629,6 +654,12 @@ class App {
     this.drawBase();
   };
 
+  private clearCanvas = () => {
+    const newGrid = createEmptyGrid(this.gridSize);
+    this.gridManager.setGrid(newGrid);
+    this.saveToHistory();
+  };
+
   private invertPixels = () => {
     const newGrid = this.grid.map(row =>
       row.map(pixel => {
@@ -845,6 +876,11 @@ class App {
     document.getElementById('clear-background')?.addEventListener('click', this.clearBackground);
     document.getElementById('bigger-grid')?.addEventListener('click', this.makeGridBigger);
     document.getElementById('smaller-grid')?.addEventListener('click', this.makeGridSmaller);
+    document.getElementById('clear-canvas')?.addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear the canvas?')) {
+        this.clearCanvas();
+      }
+    });
 
     document.addEventListener('dragover', (e) => e.preventDefault());
     document.addEventListener('drop', this.handleFileDrop);
