@@ -99,7 +99,7 @@ class App {
   private historyIndex = -1;
 
   constructor() {
-    this.gridSize = DEFAULT_GRID_SIZE;
+    this.gridSize = this.loadGridSize();
     this.baseCanvas = document.getElementById('base-canvas') as HTMLCanvasElement;
     this.overlayCanvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
     this.canvasContainer = document.querySelector('.canvas-container') as HTMLElement;
@@ -114,6 +114,21 @@ class App {
     window.addEventListener('resize', () => this.updatePixelSize());
     this.saveToHistory();
     this.updateGridSizeDisplay();
+  }
+
+  private loadGridSize(): number {
+    const saved = localStorage.getItem('tricon-grid-size');
+    if (saved) {
+      const size = parseInt(saved, 10);
+      if (size > 0 && size <= 100) { // Reasonable bounds
+        return size;
+      }
+    }
+    return DEFAULT_GRID_SIZE;
+  }
+
+  private saveGridSize(): void {
+    localStorage.setItem('tricon-grid-size', this.gridSize.toString());
   }
 
   private updatePixelSize() {
@@ -598,6 +613,7 @@ class App {
             }
             if (newSize && newSize > 0) {
               this.gridSize = newSize;
+              this.saveGridSize();
               this.updatePixelSize();
               this.updateGridSizeDisplay();
             }
@@ -705,6 +721,7 @@ class App {
       }
     }
     this.gridSize = size;
+    this.saveGridSize();
     this.gridManager.setGrid(newGrid);
     this.updatePixelSize();
     this.saveToHistory();
